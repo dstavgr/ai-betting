@@ -1,117 +1,72 @@
 import { notFound } from "next/navigation";
-import { Activity, CalendarDays, Sparkles, Target } from "lucide-react";
 
-import { EdgeBar } from "@/components/edge-bar";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getFixtureOpportunity } from "@/lib/api";
-import { odds as formatOddsValue, pct, shortDate, signedPct } from "@/lib/format";
+import { EventTimeline } from "@/components/EventTimeline";
+import { MatchTabs } from "@/components/MatchTabs";
+import { RecCard } from "@/components/RecCard";
+import { StatsBars } from "@/components/StatsBars";
+import { TeamCrest } from "@/components/TeamCrest";
+import { WinProbabilityBar } from "@/components/WinProbabilityBar";
+import { getFixture, getFixtureOpportunity, getFixtureRecommendations } from "@/lib/api";
+import { score, shortDate } from "@/lib/format";
+
+export const dynamic = "force-dynamic";
 
 export default async function MatchPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const opportunity = await getFixtureOpportunity(id);
+  const [fixture, opportunity, recommendations] = await Promise.all([
+    getFixture(id),
+    getFixtureOpportunity(id),
+    getFixtureRecommendations(id),
+  ]);
 
-  if (!opportunity) {
+  if (!fixture) {
     notFound();
   }
 
-  const recommendation = opportunity.recommendation;
+  const home = fixture.home_team ?? "Home";
+  const away = fixture.away_team ?? "Away";
 
   return (
-    <div className="space-y-6">
-      <section>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge>{opportunity.league}</Badge>
-          {opportunity.season ? <Badge>{opportunity.season}</Badge> : null}
-          <Badge tone={opportunity.data_state === "upcoming" ? "positive" : "caution"}>
-            {opportunity.data_state === "upcoming" ? "Upcoming" : "Validation sample"}
-          </Badge>
-          {opportunity.ai_generated ? <Badge>DeepSeek output</Badge> : null}
-          <Badge>{opportunity.status}</Badge>
+    <div className="space-y-4">
+      <section className="text-center">
+        <div className="truncate text-xs text-muted-foreground">
+          {fixture.league ?? "Super League 1"}
+          {fixture.round ? ` · ${fixture.round}` : ""}
         </div>
-        <h1 className="mt-3 text-3xl font-semibold tracking-normal">
-          {opportunity.home_team} vs {opportunity.away_team}
-        </h1>
-        <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-          <CalendarDays className="h-4 w-4" aria-hidden="true" />
-          {shortDate(opportunity.kickoff)}
-        </p>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 py-3">
+          <span className="flex min-w-0 items-center justify-end gap-2 text-sm font-medium">
+            <span className="truncate">{home}</span>
+            <TeamCrest name={home} size={28} />
+          </span>
+          <span className="rounded-md bg-muted px-3 py-1 font-mono text-lg font-bold">
+            {score(fixture.goals_home, fixture.goals_away)}
+          </span>
+          <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
+            <TeamCrest name={away} size={28} />
+            <span className="truncate">{away}</span>
+          </span>
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {fixture.status_long ?? fixture.status_short ?? "Status unavailable"} · {shortDate(fixture.kickoff_at)}
+        </div>
       </section>
 
-      <Card>
-        <CardContent className="space-y-4">
-          <div className="flex items-start gap-3">
-            <Sparkles className="mt-1 h-5 w-5 text-primary" aria-hidden="true" />
-            <div>
-              <p className="text-lg font-semibold">{opportunity.headline}</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">{opportunity.interesting_fact}</p>
-            </div>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-3">
-            <Fact label="Angle" value={opportunity.bet_angle} />
-            <Fact label="Synced sample" value={`${opportunity.h2h_sample_size} H2H / ${opportunity.sample_size} form`} />
-            <Fact label="Read" value={opportunity.model_note} />
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 lg:grid-cols-[1fr_.9fr]">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Historical Angle</CardTitle>
-            <Target className="h-4 w-4 text-primary" aria-hidden="true" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm leading-6 text-muted-foreground">{opportunity.historical_angle}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Priced Signal</CardTitle>
-            <Activity className="h-4 w-4 text-primary" aria-hidden="true" />
-          </CardHeader>
-          <CardContent>
-            {!recommendation ? (
-              <p className="text-sm leading-6 text-muted-foreground">
-                Odds are not complete enough for a priced model bet. Treat the angle as a watchlist read.
-              </p>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone={recommendation.decision === "recommend" ? "positive" : "caution"}>
-                    {recommendation.decision === "recommend" ? "Research signal" : "No bet"}
-                  </Badge>
-                  <Badge>{recommendation.market}</Badge>
-                  <Badge>{recommendation.bookmaker_slug}</Badge>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">
-                    {recommendation.selection} at {formatOddsValue(recommendation.decimal_odds)}
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">{recommendation.explanation}</p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <Fact label="Fair probability" value={pct(recommendation.p_fair)} />
-                  <Fact label="Market probability" value={pct(recommendation.p_market)} />
-                  <Fact label="Expected value" value={signedPct(recommendation.ev_per_unit)} />
-                </div>
-                <EdgeBar recommendation={recommendation} />
+      <MatchTabs
+        overview={
+          <>
+            <WinProbabilityBar recommendations={recommendations} home={home} away={away} />
+            <RecCard rec={opportunity?.recommendation ?? recommendations[0] ?? null} />
+            {opportunity ? (
+              <div className="space-y-2 rounded-lg border border-border bg-white p-4 text-sm leading-6">
+                <p>{opportunity.interesting_fact}</p>
+                <p className="text-muted-foreground">{opportunity.historical_angle}</p>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-border bg-white p-3">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 break-words font-semibold">{value}</p>
+            ) : null}
+          </>
+        }
+        stats={<StatsBars stats={fixture.team_statistics} />}
+        timeline={<EventTimeline events={fixture.events} />}
+      />
     </div>
   );
 }
