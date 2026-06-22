@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { EventTimeline } from "@/components/EventTimeline";
+import { LiveBadge } from "@/components/LiveBadge";
 import { MatchTabs } from "@/components/MatchTabs";
 import { RecCard } from "@/components/RecCard";
 import { StatsBars } from "@/components/StatsBars";
@@ -20,6 +21,8 @@ import {
   getTeams,
 } from "@/lib/api";
 import { score, shortDate } from "@/lib/format";
+import { defaultLeague } from "@/lib/leagues";
+import { liveStatusLabel } from "@/lib/matchStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +43,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
 
   const home = fixture.home_team ?? "Home";
   const away = fixture.away_team ?? "Away";
+  const liveLabel = liveStatusLabel(fixture.status_short);
   const teamApiFootballIds = new Map(
     teams
       .filter((team) => team.api_football_id !== null)
@@ -49,7 +53,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const scoreHeader = () => (
     <section className="text-center">
       <div className="truncate text-xs text-muted-foreground">
-        {fixture.league ?? "Super League 1"}
+        {fixture.league ?? defaultLeague.name}
         {fixture.round ? ` · ${fixture.round}` : ""}
       </div>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 py-3">
@@ -65,8 +69,11 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           <span className="truncate">{away}</span>
         </span>
       </div>
-      <div className="text-xs text-muted-foreground">
-        {fixture.status_long ?? fixture.status_short ?? "Status unavailable"} · {shortDate(fixture.kickoff_at)}
+      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+        {liveLabel ? <LiveBadge label={liveLabel} /> : null}
+        <span>
+          {fixture.status_long ?? fixture.status_short ?? "Status unavailable"} · {shortDate(fixture.kickoff_at)}
+        </span>
       </div>
     </section>
   );

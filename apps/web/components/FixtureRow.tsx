@@ -1,8 +1,10 @@
 import Link from "next/link";
 
+import { LiveBadge } from "@/components/LiveBadge";
 import { TeamCrest } from "@/components/TeamCrest";
 import { Badge } from "@/components/ui/badge";
 import { shortDate } from "@/lib/format";
+import { liveStatusLabel } from "@/lib/matchStatus";
 import type { Fixture } from "@/lib/types";
 
 const FINISHED = new Set(["FT", "AET", "PEN"]);
@@ -29,6 +31,7 @@ export function FixtureRow({
   const finished = fixture.status_short ? FINISHED.has(fixture.status_short) : false;
   const kickoff = new Date(fixture.kickoff_at).toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit" });
   const status = fixture.status_short ? (STATUS_LABELS[fixture.status_short] ?? fixture.status_short) : "NS";
+  const liveLabel = liveStatusLabel(fixture.status_short);
 
   return (
     <Link
@@ -37,9 +40,13 @@ export function FixtureRow({
     >
       <div className="flex shrink-0 flex-col items-center gap-1">
         <span className="text-[11px] text-muted-foreground">{kickoff}</span>
-        <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-semibold leading-none text-muted-foreground">
-          {status}
-        </span>
+        {liveLabel ? (
+          <LiveBadge label={liveLabel} />
+        ) : (
+          <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-semibold leading-none text-muted-foreground">
+            {status}
+          </span>
+        )}
       </div>
       <div className="min-w-0 space-y-1.5">
         <div className="flex items-center gap-2 text-sm">

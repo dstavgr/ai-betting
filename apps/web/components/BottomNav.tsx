@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CalendarDays, Lightbulb, ListOrdered, Menu } from "lucide-react";
 
+import { LeagueSwitcher } from "@/components/LeagueSwitcher";
 import { cn } from "@/lib/utils";
 
 const tabs = [
@@ -54,6 +55,7 @@ export function SidebarNav() {
   return (
     <aside className="hidden w-44 shrink-0 md:block lg:w-52" aria-label="Primary">
       <nav className="sticky top-[76px] space-y-1 rounded-xl border border-border bg-card p-2 text-card-foreground shadow-sm">
+        <LeagueSwitcher compact className="mb-2 border-b border-border px-2 pb-3 pt-1" />
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const active = isActive(tab.href);
