@@ -8,6 +8,9 @@ import "../styles/globals.css";
 export const metadata: Metadata = {
   title: "Bet Analytics — Greek Super League",
   description: "Soccer match-center and betting research for the Greek Super League.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default async function RootLayout({
