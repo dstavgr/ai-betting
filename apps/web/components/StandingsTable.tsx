@@ -10,32 +10,42 @@ export function StandingsTable({
   teamApiFootballIds?: Map<string, number>;
 }) {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-6">#</TableHead>
-          <TableHead>Team</TableHead>
-          <TableHead className="text-center">P</TableHead>
-          <TableHead className="text-center">GD</TableHead>
-          <TableHead className="text-center">Pts</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((row, index) => (
-          <TableRow key={row.team}>
-            <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-            <TableCell>
-              <div className="flex items-center gap-2">
-                <TeamCrest name={row.team} apiFootballId={teamApiFootballIds?.get(row.team)} />
-                <span>{row.team}</span>
-              </div>
-            </TableCell>
-            <TableCell className="text-center">{row.played}</TableCell>
-            <TableCell className="text-center">{row.goalDiff > 0 ? `+${row.goalDiff}` : row.goalDiff}</TableCell>
-            <TableCell className="text-center font-semibold">{row.points}</TableCell>
+    <div className="overflow-hidden rounded-md border border-border bg-white">
+      <Table className="min-w-[360px]">
+        <TableHeader className="bg-muted/45">
+          <TableRow className="hover:bg-transparent">
+            <TableHead className="w-8 px-2">#</TableHead>
+            <TableHead className="px-2">Team</TableHead>
+            <TableHead className="px-2 text-center">P</TableHead>
+            <TableHead className="hidden px-2 text-center sm:table-cell">W</TableHead>
+            <TableHead className="hidden px-2 text-center sm:table-cell">D</TableHead>
+            <TableHead className="hidden px-2 text-center sm:table-cell">L</TableHead>
+            <TableHead className="px-2 text-center">GD</TableHead>
+            <TableHead className="px-2 text-center">Pts</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row, index) => (
+            <TableRow key={row.team}>
+              <TableCell className="px-2 py-2 text-xs text-muted-foreground">{index + 1}</TableCell>
+              <TableCell className="max-w-36 px-2 py-2 sm:max-w-none">
+                <div className="flex min-w-0 items-center gap-2">
+                  <TeamCrest name={row.team} apiFootballId={teamApiFootballIds?.get(row.team)} />
+                  <span className="truncate font-medium">{row.team}</span>
+                </div>
+              </TableCell>
+              <TableCell className="px-2 py-2 text-center">{row.played}</TableCell>
+              <TableCell className="hidden px-2 py-2 text-center sm:table-cell">{row.won}</TableCell>
+              <TableCell className="hidden px-2 py-2 text-center sm:table-cell">{row.drawn}</TableCell>
+              <TableCell className="hidden px-2 py-2 text-center sm:table-cell">{row.lost}</TableCell>
+              <TableCell className="px-2 py-2 text-center">
+                {row.goalDiff > 0 ? `+${row.goalDiff}` : row.goalDiff}
+              </TableCell>
+              <TableCell className="px-2 py-2 text-center font-semibold">{row.points}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }

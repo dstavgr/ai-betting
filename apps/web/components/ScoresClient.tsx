@@ -39,7 +39,13 @@ export function ScoresClient({
   return (
     <div>
       <DateStrip dates={dates} active={active} onSelect={setActive} />
-      <div>
+      <section className="overflow-hidden rounded-md border border-border bg-white">
+        <div className="flex items-center gap-2 border-b border-border bg-muted/45 px-3 py-2">
+          <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+            SL
+          </span>
+          <span className="text-xs font-semibold text-foreground">Super League 1</span>
+        </div>
         {rows.map((fixture) => (
           <FixtureRow
             key={fixture.id}
@@ -49,7 +55,7 @@ export function ScoresClient({
             awayApiFootballId={fixture.away_team ? teamApiFootballIds[fixture.away_team] : undefined}
           />
         ))}
-      </div>
+      </section>
     </div>
   );
 }

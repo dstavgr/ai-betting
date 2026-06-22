@@ -1,5 +1,28 @@
 "use client";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function parseDateKey(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function startOfToday() {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+}
+
+function dateLabel(date: string) {
+  const target = parseDateKey(date);
+  const diffDays = Math.round((target.getTime() - startOfToday().getTime()) / DAY_MS);
+
+  if (diffDays === 0) return "Today";
+  if (diffDays === -1) return "Yesterday";
+  if (diffDays === 1) return "Tomorrow";
+
+  return target.toLocaleDateString("en", { weekday: "short", day: "numeric", month: "short" });
+}
+
 export function DateStrip({
   dates,
   active,
@@ -10,17 +33,19 @@ export function DateStrip({
   onSelect: (date: string) => void;
 }) {
   return (
-    <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto px-4 pb-1">
+    <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto border-b border-border px-4 pb-3">
       {dates.map((date) => (
         <button
           key={date}
           onClick={() => onSelect(date)}
-          className={`shrink-0 rounded-full px-3 py-1 text-xs ${
-            date === active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+          className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+            date === active
+              ? "border-primary bg-primary text-primary-foreground shadow-sm"
+              : "border-border bg-white text-muted-foreground hover:bg-muted/70"
           }`}
           type="button"
         >
-          {new Date(date).toLocaleDateString("en", { weekday: "short", day: "numeric", month: "short" })}
+          {dateLabel(date)}
         </button>
       ))}
     </div>
