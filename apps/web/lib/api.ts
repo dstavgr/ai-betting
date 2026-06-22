@@ -45,17 +45,17 @@ export async function getMatches(): Promise<Match[]> {
   }
 }
 
-export async function getOpportunities(limit = 6): Promise<Opportunity[]> {
+export async function getOpportunities(limit = 12, ai = false): Promise<Opportunity[]> {
   try {
-    return await fetchJson<Opportunity[]>(`/opportunities?limit=${limit}&ai=true`);
+    return await fetchJson<Opportunity[]>(`/opportunities?limit=${limit}&ai=${ai}`);
   } catch {
     return [];
   }
 }
 
-export async function getFixtureOpportunity(id: string | number): Promise<Opportunity | null> {
+export async function getFixtureOpportunity(id: string | number, ai = false): Promise<Opportunity | null> {
   try {
-    return await fetchJson<Opportunity>(`/opportunities/${id}?ai=true`);
+    return await fetchJson<Opportunity>(`/opportunities/${id}?ai=${ai}`);
   } catch {
     return null;
   }
@@ -83,6 +83,10 @@ export async function getFixtures(limit = 24): Promise<Fixture[]> {
   } catch {
     return [];
   }
+}
+
+export async function getSeasonFixtures(): Promise<Fixture[]> {
+  return getFixtures(500);
 }
 
 export async function getFixture(id: string | number): Promise<FixtureDetail | null> {
