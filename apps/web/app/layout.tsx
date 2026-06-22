@@ -24,8 +24,8 @@ const barlowCondensed = Barlow_Condensed({
 });
 
 export const metadata: Metadata = {
-  title: "Bet Analytics — Greek Super League",
-  description: "Soccer match-center and betting research for the Greek Super League.",
+  title: "Bet AI — Football match-center & betting research",
+  description: "Bet AI: AI-assisted football match-center, odds, and betting research. Research and education only.",
   icons: {
     icon: "/favicon.svg",
   },
@@ -54,6 +54,7 @@ export default async function RootLayout({
       <body className={`${barlow.variable} ${barlowCondensed.variable} font-sans antialiased`}>
         <div className="mx-auto flex min-h-screen max-w-2xl flex-col bg-background text-foreground md:max-w-6xl">
           <header className="sticky top-0 z-40 border-b border-border bg-card/95 px-4 py-3 shadow-sm backdrop-blur md:px-6">
+            <span className="mb-1 block font-display text-base font-extrabold uppercase tracking-tight">Bet<span className="text-primary">AI</span></span>
             <Suspense fallback={<LeagueSwitcherFallback />}>
               <LeagueSwitcher />
             </Suspense>
