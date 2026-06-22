@@ -12,6 +12,7 @@ from app.features import FEATURE_VERSION
 from app.modeling.baseline import (
     DEFAULT_MODEL_PROBABILITIES,
     DIXON_COLES_XI,
+    MODEL_WEIGHT,
     MODEL_VERSION,
     OUTCOME_ORDER,
     OUTCOME_PROB_KEYS,
@@ -42,12 +43,16 @@ def evaluate_walkforward(
     *,
     limit: int = 1000,
     warmup_matches: int = WALKFORWARD_WARMUP_MATCHES,
+    xi: float | None = None,
+    model_weight: float | None = None,
 ) -> dict[str, Any]:
     evaluated = 0
     brier_total = 0.0
     log_loss_total = 0.0
     bucket_totals: dict[str, dict[str, float]] = {}
-    model_cache: dict[tuple[int | None, datetime], DixonColesModel] = {}
+    model_cache: dict[tuple[int | None, datetime, float], DixonColesModel] = {}
+    effective_xi = DIXON_COLES_XI if xi is None else float(xi)
+    effective_model_weight = MODEL_WEIGHT if model_weight is None else float(model_weight)
 
     fixtures_seen = 0
     fixtures_with_features = 0
@@ -89,8 +94,14 @@ def evaluate_walkforward(
             context.league_id,
             context.kickoff_at,
             training_matches,
+            xi=effective_xi,
         )
-        probabilities = walkforward_probabilities_for_fixture(session, context, model)
+        probabilities = walkforward_probabilities_for_fixture(
+            session,
+            context,
+            model,
+            model_weight=effective_model_weight,
+        )
 
         true_probability = max(probabilities[str(target_result)], 1e-9)
         brier_total += sum(
@@ -113,6 +124,7 @@ def evaluate_walkforward(
             context,
             snapshot,
             model,
+            model_weight=effective_model_weight,
         )
         if not recommendations:
             continue
@@ -253,6 +265,8 @@ def walkforward_probabilities_for_fixture(
     session: Session,
     context: FixtureContext,
     model: DixonColesModel,
+    *,
+    model_weight: float = MODEL_WEIGHT,
 ) -> dict[str, float]:
     model_probabilities = model_probabilities_from_model(context, model)
     selected_prices, liquidity = latest_prematch_1x2_prices(
@@ -262,7 +276,11 @@ def walkforward_probabilities_for_fixture(
     )
     if set(selected_prices) != set(OUTCOME_ORDER):
         return model_probabilities
-    return blend_probabilities(model_probabilities, market_probabilities_from_liquidity(liquidity))
+    return blend_probabilities(
+        model_probabilities,
+        market_probabilities_from_liquidity(liquidity),
+        model_weight=model_weight,
+    )
 
 
 def walkforward_recommendations_for_fixture(
@@ -270,6 +288,8 @@ def walkforward_recommendations_for_fixture(
     context: FixtureContext,
     snapshot: Mapping[str, Any],
     model: DixonColesModel,
+    *,
+    model_weight: float = MODEL_WEIGHT,
 ) -> list[dict[str, Any]]:
     selected_prices, liquidity = latest_prematch_1x2_prices(
         session,
@@ -281,7 +301,11 @@ def walkforward_recommendations_for_fixture(
 
     model_probabilities = model_probabilities_from_model(context, model)
     market_probabilities = market_probabilities_from_liquidity(liquidity)
-    probabilities = blend_probabilities(model_probabilities, market_probabilities)
+    probabilities = blend_probabilities(
+        model_probabilities,
+        market_probabilities,
+        model_weight=model_weight,
+    )
     features = snapshot["features"] if isinstance(snapshot.get("features"), Mapping) else {}
     confidence = estimate_confidence(features, liquidity)
     market_liquid = (
@@ -324,14 +348,16 @@ def model_probabilities_from_model(
 
 
 def _walkforward_model(
-    model_cache: dict[tuple[int | None, datetime], DixonColesModel],
+    model_cache: dict[tuple[int | None, datetime, float], DixonColesModel],
     league_id: int | None,
     kickoff_at: datetime,
     matches: list[tuple[int, int, int, int, datetime]],
+    *,
+    xi: float = DIXON_COLES_XI,
 ) -> DixonColesModel:
-    key = (int(league_id) if league_id is not None else None, kickoff_at)
+    key = (int(league_id) if league_id is not None else None, kickoff_at, float(xi))
     model = model_cache.get(key)
     if model is None:
-        model = fit_dixon_coles(matches, xi=DIXON_COLES_XI)
+        model = fit_dixon_coles(matches, xi=xi)
         model_cache[key] = model
     return model

@@ -22,21 +22,7 @@ def test_walkforward_smoke_and_no_future_leakage(monkeypatch: pytest.MonkeyPatch
     ) -> DixonColesModel:
         rows = list(matches)
         fit_calls.append(rows)
-        team_ids = sorted({row[0] for row in rows} | {row[1] for row in rows})
-        return DixonColesModel(
-            team_ids=tuple(team_ids),
-            attack={},
-            defence={},
-            home_advantage=0.0,
-            rho=0.0,
-            average_attack=0.0,
-            average_defence=0.0,
-            xi=xi,
-            fitted_at=max(row[4] for row in rows),
-            match_count=len(rows),
-            log_likelihood=0.0,
-            converged=True,
-        )
+        return _model_from_matches(rows, xi)
 
     monkeypatch.setattr(walkforward, "fit_dixon_coles", fake_fit_dixon_coles)
 
@@ -62,6 +48,49 @@ def test_walkforward_smoke_and_no_future_leakage(monkeypatch: pytest.MonkeyPatch
     for target_kickoff, fitted_matches in zip(target_kickoffs, fit_calls, strict=True):
         assert len(fitted_matches) >= 30
         assert all(_ensure_utc(match[4]) < target_kickoff for match in fitted_matches)
+
+
+def test_walkforward_accepts_tuning_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _session_with_walkforward_data()
+    fit_xis: list[float] = []
+    blend_weights: list[float] = []
+    original_blend_probabilities = walkforward.blend_probabilities
+
+    def fake_fit_dixon_coles(
+        matches: list[tuple[int, int, int, int, datetime]],
+        *,
+        xi: float,
+    ) -> DixonColesModel:
+        fit_xis.append(xi)
+        return _model_from_matches(list(matches), xi)
+
+    def capture_blend_probabilities(
+        model_probabilities,
+        market_probabilities,
+        model_weight: float = 0.5,
+    ):
+        blend_weights.append(model_weight)
+        return original_blend_probabilities(
+            model_probabilities,
+            market_probabilities,
+            model_weight=model_weight,
+        )
+
+    monkeypatch.setattr(walkforward, "fit_dixon_coles", fake_fit_dixon_coles)
+    monkeypatch.setattr(walkforward, "blend_probabilities", capture_blend_probabilities)
+
+    result = walkforward.evaluate_walkforward(
+        session,
+        limit=40,
+        xi=0.004,
+        model_weight=0.65,
+    )
+
+    assert result["sample_size"] == 6
+    assert fit_xis
+    assert set(fit_xis) == {0.004}
+    assert blend_weights
+    assert set(blend_weights) == {0.65}
 
 
 def _session_with_walkforward_data():
@@ -270,3 +299,24 @@ def _ensure_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
+
+
+def _model_from_matches(
+    matches: list[tuple[int, int, int, int, datetime]],
+    xi: float,
+) -> DixonColesModel:
+    team_ids = sorted({row[0] for row in matches} | {row[1] for row in matches})
+    return DixonColesModel(
+        team_ids=tuple(team_ids),
+        attack={},
+        defence={},
+        home_advantage=0.0,
+        rho=0.0,
+        average_attack=0.0,
+        average_defence=0.0,
+        xi=xi,
+        fitted_at=max(row[4] for row in matches),
+        match_count=len(matches),
+        log_likelihood=0.0,
+        converged=True,
+    )
