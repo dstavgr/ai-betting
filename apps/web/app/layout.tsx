@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { BottomNav } from "@/components/BottomNav";
+import { EngineStatusBanner } from "@/components/EngineStatusBanner";
 
 import "../styles/globals.css";
 
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
   description: "Soccer match-center and betting research for the Greek Super League.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -22,6 +23,7 @@ export default function RootLayout({
             <span className="block text-sm font-semibold">Super League 1</span>
             <span className="block text-xs text-muted-foreground">2025/26 · research, not advice</span>
           </header>
+          <EngineStatusBanner />
           <main className="flex-1 px-4 py-4 pb-24">{children}</main>
           <footer className="px-4 pb-24 pt-2 text-center text-[11px] text-muted-foreground">
             Research and education only. Not betting advice. 21+.
