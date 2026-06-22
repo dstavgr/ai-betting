@@ -26,7 +26,9 @@ export default async function TipsPage() {
           No recommended tips right now. Check the match pages for the full research notes, including no-bet calls.
         </p>
       ) : (
-        recommendedOpportunities.map((opportunity) => <TipCard key={opportunity.fixture_id} o={opportunity} />)
+        <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+          {recommendedOpportunities.map((opportunity) => <TipCard key={opportunity.fixture_id} o={opportunity} />)}
+        </div>
       )}
     </div>
   );

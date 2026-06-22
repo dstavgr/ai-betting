@@ -28,12 +28,12 @@ export function StandingsTable({
   return (
     <div className="space-y-2">
       <div className="overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-sm">
-        <Table className="min-w-[360px]">
+        <Table className="min-w-[360px] md:min-w-[640px]">
           <TableHeader className="bg-muted/45">
             <TableRow className="border-l-4 border-l-transparent hover:bg-transparent">
               <TableHead className="w-8 px-2">#</TableHead>
               <TableHead className="px-2">Team</TableHead>
-              <TableHead className="hidden px-2 text-left sm:table-cell">Form</TableHead>
+              <TableHead className="hidden px-2 text-left md:table-cell">Form</TableHead>
               <TableHead className="px-2 text-center">P</TableHead>
               <TableHead className="hidden px-2 text-center sm:table-cell">W</TableHead>
               <TableHead className="hidden px-2 text-center sm:table-cell">D</TableHead>
@@ -46,13 +46,13 @@ export function StandingsTable({
             {rows.map((row, index) => (
               <TableRow key={row.team} className={cn(zoneClassName(index, rows.length))}>
                 <TableCell className="px-2 py-2 text-xs text-muted-foreground">{index + 1}</TableCell>
-                <TableCell className="max-w-36 px-2 py-2 sm:max-w-none">
+                <TableCell className="max-w-36 px-2 py-2 md:max-w-none">
                   <div className="flex min-w-0 items-center gap-2">
                     <TeamCrest name={row.team} apiFootballId={teamApiFootballIds?.get(row.team)} />
                     <span className="truncate font-medium">{row.team}</span>
                   </div>
                 </TableCell>
-                <TableCell className="hidden min-w-32 px-2 py-2 sm:table-cell">
+                <TableCell className="hidden min-w-32 px-2 py-2 md:table-cell">
                   <FormGuide fixtures={fixtures} teamName={row.team} limit={5} />
                 </TableCell>
                 <TableCell className="numeric px-2 py-2 text-center font-display font-semibold">{row.played}</TableCell>

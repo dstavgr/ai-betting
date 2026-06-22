@@ -46,15 +46,17 @@ export function ScoresClient({
           </span>
           <span className="font-display text-sm font-semibold leading-none text-foreground">Super League 1</span>
         </div>
-        {rows.map((fixture) => (
-          <FixtureRow
-            key={fixture.id}
-            fixture={fixture}
-            hasTip={fixture.hasTip}
-            homeApiFootballId={fixture.home_team ? teamApiFootballIds[fixture.home_team] : undefined}
-            awayApiFootballId={fixture.away_team ? teamApiFootballIds[fixture.away_team] : undefined}
-          />
-        ))}
+        <div className="lg:grid lg:grid-cols-2">
+          {rows.map((fixture) => (
+            <FixtureRow
+              key={fixture.id}
+              fixture={fixture}
+              hasTip={fixture.hasTip}
+              homeApiFootballId={fixture.home_team ? teamApiFootballIds[fixture.home_team] : undefined}
+              awayApiFootballId={fixture.away_team ? teamApiFootballIds[fixture.away_team] : undefined}
+            />
+          ))}
+        </div>
       </section>
     </div>
   );

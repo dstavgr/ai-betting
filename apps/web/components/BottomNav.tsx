@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CalendarDays, Lightbulb, ListOrdered, Menu } from "lucide-react";
 
+import { cn } from "@/lib/utils";
+
 const tabs = [
   { href: "/", label: "Scores", icon: CalendarDays },
   { href: "/tips", label: "Tips", icon: Lightbulb },
@@ -11,13 +13,18 @@ const tabs = [
   { href: "/more", label: "More", icon: Menu },
 ];
 
-export function BottomNav() {
+function usePrimaryNavState() {
   const pathname = usePathname();
-  const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
+
+  return (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
+}
+
+export function BottomNav() {
+  const isActive = usePrimaryNavState();
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 border-t border-border bg-card/95 shadow-sm backdrop-blur md:mx-auto md:max-w-2xl"
+      className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 border-t border-border bg-card/95 shadow-sm backdrop-blur md:hidden"
       aria-label="Primary"
     >
       {tabs.map((tab) => {
@@ -38,5 +45,36 @@ export function BottomNav() {
         );
       })}
     </nav>
+  );
+}
+
+export function SidebarNav() {
+  const isActive = usePrimaryNavState();
+
+  return (
+    <aside className="hidden w-44 shrink-0 md:block lg:w-52" aria-label="Primary">
+      <nav className="sticky top-[76px] space-y-1 rounded-xl border border-border bg-card p-2 text-card-foreground shadow-sm">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const active = isActive(tab.href);
+
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                active
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+              )}
+            >
+              <Icon className="h-4 w-4" aria-hidden="true" />
+              <span>{tab.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+    </aside>
   );
 }
