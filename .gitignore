@@ -16,3 +16,5 @@ coverage/
 *.log
 
 postgres-data/
+
+*.tsbuildinfo
