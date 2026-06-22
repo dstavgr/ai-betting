@@ -1,6 +1,7 @@
 export type LeagueConfig = {
   key: string;
   name: string;
+  apiName: string;
   season: string;
 };
 
@@ -8,7 +9,14 @@ export const leagues: readonly LeagueConfig[] = [
   {
     key: "gr-superleague",
     name: "Super League 1",
+    apiName: "Super League 1",
     season: "2025/26",
+  },
+  {
+    key: "world-cup",
+    name: "World Cup",
+    apiName: "World Cup",
+    season: "2026",
   },
 ] as const;
 

@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { CalendarDays, Lightbulb, ListOrdered, Menu } from "lucide-react";
 
 import { LeagueSwitcher } from "@/components/LeagueSwitcher";
+import { getLeagueByKey } from "@/lib/leagues";
 import { cn } from "@/lib/utils";
 
 const tabs = [
@@ -20,8 +21,26 @@ function usePrimaryNavState() {
   return (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 }
 
+function usePrimaryNavHref() {
+  const searchParams = useSearchParams();
+  const leagueParam = searchParams.get("league");
+  const activeLeague = getLeagueByKey(leagueParam);
+  const shouldKeepLeague = leagueParam === activeLeague.key;
+
+  return (href: string) => {
+    if (!shouldKeepLeague) {
+      return href;
+    }
+
+    const params = new URLSearchParams();
+    params.set("league", activeLeague.key);
+    return `${href}?${params.toString()}`;
+  };
+}
+
 export function BottomNav() {
   const isActive = usePrimaryNavState();
+  const navHref = usePrimaryNavHref();
 
   return (
     <nav
@@ -35,7 +54,7 @@ export function BottomNav() {
         return (
           <Link
             key={tab.href}
-            href={tab.href}
+            href={navHref(tab.href)}
             className={`flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors ${
               active ? "text-primary" : "text-muted-foreground"
             }`}
@@ -51,6 +70,7 @@ export function BottomNav() {
 
 export function SidebarNav() {
   const isActive = usePrimaryNavState();
+  const navHref = usePrimaryNavHref();
 
   return (
     <aside className="hidden w-44 shrink-0 md:block lg:w-52" aria-label="Primary">
@@ -63,7 +83,7 @@ export function SidebarNav() {
           return (
             <Link
               key={tab.href}
-              href={tab.href}
+              href={navHref(tab.href)}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 active

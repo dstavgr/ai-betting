@@ -1,13 +1,10 @@
 "use client";
 
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
 
-import { defaultLeague, getLeagueByKey, leagues } from "@/lib/leagues";
+import { getLeagueByKey, leagues } from "@/lib/leagues";
 import { cn } from "@/lib/utils";
-
-const STORAGE_KEY = "ai-betting.active-league";
-const CHANGE_EVENT = "ai-betting:league-change";
 
 type LeagueSwitcherProps = {
   compact?: boolean;
@@ -15,40 +12,16 @@ type LeagueSwitcherProps = {
 };
 
 export function LeagueSwitcher({ compact = false, className }: LeagueSwitcherProps) {
-  const [activeKey, setActiveKey] = useState(defaultLeague.key);
-
-  useEffect(() => {
-    const storedKey = window.localStorage.getItem(STORAGE_KEY);
-    if (storedKey) {
-      setActiveKey(getLeagueByKey(storedKey).key);
-    }
-
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === STORAGE_KEY) {
-        setActiveKey(getLeagueByKey(event.newValue).key);
-      }
-    };
-
-    const onLeagueChange = (event: Event) => {
-      const key = event instanceof CustomEvent && typeof event.detail === "string" ? event.detail : null;
-      setActiveKey(getLeagueByKey(key).key);
-    };
-
-    window.addEventListener("storage", onStorage);
-    window.addEventListener(CHANGE_EVENT, onLeagueChange);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener(CHANGE_EVENT, onLeagueChange);
-    };
-  }, []);
-
-  const activeLeague = useMemo(() => getLeagueByKey(activeKey), [activeKey]);
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeLeague = getLeagueByKey(searchParams.get("league"));
 
   const onChange = (key: string) => {
     const league = getLeagueByKey(key);
-    setActiveKey(league.key);
-    window.localStorage.setItem(STORAGE_KEY, league.key);
-    window.dispatchEvent(new CustomEvent(CHANGE_EVENT, { detail: league.key }));
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("league", league.key);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
   if (leagues.length === 1) {

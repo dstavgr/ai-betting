@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { Barlow, Barlow_Condensed } from "next/font/google";
+import { Suspense } from "react";
 
 import { BottomNav, SidebarNav } from "@/components/BottomNav";
 import { EngineStatusBanner } from "@/components/EngineStatusBanner";
 import { LeagueSwitcher } from "@/components/LeagueSwitcher";
+import { defaultLeague } from "@/lib/leagues";
 
 import "../styles/globals.css";
 
@@ -29,6 +31,19 @@ export const metadata: Metadata = {
   },
 };
 
+function LeagueSwitcherFallback() {
+  return (
+    <div className="min-w-0">
+      <span className="block truncate font-display text-lg font-semibold leading-none tracking-normal">
+        {defaultLeague.name}
+      </span>
+      <span className="block truncate text-xs text-muted-foreground">
+        {defaultLeague.season} &middot; research, not advice
+      </span>
+    </div>
+  );
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -39,11 +54,15 @@ export default async function RootLayout({
       <body className={`${barlow.variable} ${barlowCondensed.variable} font-sans antialiased`}>
         <div className="mx-auto flex min-h-screen max-w-2xl flex-col bg-background text-foreground md:max-w-6xl">
           <header className="sticky top-0 z-40 border-b border-border bg-card/95 px-4 py-3 shadow-sm backdrop-blur md:px-6">
-            <LeagueSwitcher />
+            <Suspense fallback={<LeagueSwitcherFallback />}>
+              <LeagueSwitcher />
+            </Suspense>
           </header>
           <EngineStatusBanner />
           <div className="flex flex-1 md:gap-4 md:px-6 md:py-5 lg:gap-6">
-            <SidebarNav />
+            <Suspense fallback={null}>
+              <SidebarNav />
+            </Suspense>
             <div className="flex min-w-0 flex-1 flex-col">
               <main className="flex-1 px-4 py-4 pb-24 md:px-0 md:py-0 md:pb-0">{children}</main>
               <footer className="px-4 pb-24 pt-2 text-center text-[11px] text-muted-foreground md:px-0 md:pb-1 md:pt-6">
@@ -51,7 +70,9 @@ export default async function RootLayout({
               </footer>
             </div>
           </div>
-          <BottomNav />
+          <Suspense fallback={null}>
+            <BottomNav />
+          </Suspense>
         </div>
       </body>
     </html>
