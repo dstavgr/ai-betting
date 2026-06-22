@@ -7,24 +7,40 @@ name = "betting-engine"
 version = "0.1.0"
 description = "FastAPI engine for soccer betting analytics research."
 requires-python = ">=3.12"
+# Core runtime deps = exactly what the app imports today. Keep this list in
+# sync with services/engine/requirements.txt (the pinned set the Docker image
+# installs). The ML/LLM/scheduler stacks below are roadmap extras: declared so
+# intent is documented, but NOT installed in the prod image until code uses
+# them. Do not 'import pandas' etc. in app/ without first adding the extra to
+# requirements.txt and rebuilding the engine image.
 dependencies = [
   "alembic>=1.13",
-  "apscheduler>=3.10",
   "fastapi>=0.115",
   "httpx>=0.27",
-  "litellm>=1.52",
-  "numpy>=2.0",
-  "pandas>=2.2",
+  "psycopg[binary]>=3.2",
   "pydantic>=2.9",
   "pydantic-settings>=2.5",
-  "psycopg[binary]>=3.2",
-  "scikit-learn>=1.5",
   "sqlalchemy>=2.0",
-  "statsmodels>=0.14",
   "uvicorn[standard]>=0.30"
 ]
 
 [project.optional-dependencies]
+# Roadmap — not yet used by any code. Install with: pip install -e '.[ml]'
+ml = [
+  "numpy>=2.0",
+  "pandas>=2.2",
+  "scikit-learn>=1.5",
+  "statsmodels>=0.14"
+]
+# Roadmap — LLM calls currently go through a thin httpx client (app/llm),
+# not litellm. Adopt only if/when switching to a multi-provider abstraction.
+llm = [
+  "litellm>=1.52"
+]
+# Roadmap — for automated ingestion scheduling (no scheduler runs today).
+scheduler = [
+  "apscheduler>=3.10"
+]
 dev = [
   "pytest>=8.3",
   "pytest-asyncio>=0.24",
