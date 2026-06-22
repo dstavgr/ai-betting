@@ -33,7 +33,7 @@ export function FixtureRow({
   return (
     <Link
       href={`/match/${fixture.id}`}
-      className="grid grid-cols-[3.25rem_1fr_auto] items-center gap-3 border-b border-border px-3 py-2.5 transition-colors last:border-b-0 hover:bg-muted/35"
+      className="grid grid-cols-[3.25rem_1fr_auto] items-center gap-3 border-b border-border px-3 py-2.5 transition-colors last:border-b-0 hover:bg-muted/35 lg:[&:nth-last-child(-n+2)]:border-b-0 lg:[&:nth-child(odd)]:border-r"
     >
       <div className="flex shrink-0 flex-col items-center gap-1">
         <span className="text-[11px] text-muted-foreground">{kickoff}</span>

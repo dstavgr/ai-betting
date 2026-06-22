@@ -33,7 +33,7 @@ export function DateStrip({
   onSelect: (date: string) => void;
 }) {
   return (
-    <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto border-b border-border px-4 pb-3">
+    <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto border-b border-border px-4 pb-3 md:mx-0 md:px-0">
       {dates.map((date) => (
         <button
           key={date}
