@@ -1,4 +1,16 @@
-import type { DataSummary, FeatureSnapshot, Fixture, FixtureDetail, FixtureOdds, Health, Match, Opportunity, Recommendation, ResearchSummary } from "./types";
+import type {
+  DataSummary,
+  FeatureSnapshot,
+  Fixture,
+  FixtureDetail,
+  FixtureOdds,
+  Health,
+  Match,
+  Opportunity,
+  Recommendation,
+  ResearchSummary,
+  Team,
+} from "./types";
 
 const engineUrl = process.env.ENGINE_URL ?? "http://127.0.0.1:8000";
 
@@ -87,6 +99,14 @@ export async function getFixtures(limit = 24): Promise<Fixture[]> {
 
 export async function getSeasonFixtures(): Promise<Fixture[]> {
   return getFixtures(500);
+}
+
+export async function getTeams(): Promise<Team[]> {
+  try {
+    return await fetchJson<Team[]>("/data/teams");
+  } catch {
+    return [];
+  }
 }
 
 export async function getFixture(id: string | number): Promise<FixtureDetail | null> {

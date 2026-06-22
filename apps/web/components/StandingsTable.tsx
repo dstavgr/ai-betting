@@ -2,7 +2,13 @@ import { TeamCrest } from "@/components/TeamCrest";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Standing } from "@/lib/types";
 
-export function StandingsTable({ rows }: { rows: Standing[] }) {
+export function StandingsTable({
+  rows,
+  teamApiFootballIds,
+}: {
+  rows: Standing[];
+  teamApiFootballIds?: Map<string, number>;
+}) {
   return (
     <Table>
       <TableHeader>
@@ -20,7 +26,7 @@ export function StandingsTable({ rows }: { rows: Standing[] }) {
             <TableCell className="text-muted-foreground">{index + 1}</TableCell>
             <TableCell>
               <div className="flex items-center gap-2">
-                <TeamCrest name={row.team} />
+                <TeamCrest name={row.team} apiFootballId={teamApiFootballIds?.get(row.team)} />
                 <span>{row.team}</span>
               </div>
             </TableCell>

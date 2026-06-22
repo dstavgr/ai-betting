@@ -130,6 +130,13 @@ export type Fixture = {
   goals_away: number | null;
 };
 
+export type Team = {
+  id: number;
+  api_football_id: number | null;
+  name: string;
+  country: string | null;
+};
+
 export type FixtureEvent = {
   id: number;
   elapsed: number | null;

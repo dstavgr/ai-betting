@@ -8,7 +8,13 @@ import type { Fixture } from "@/lib/types";
 
 type Row = Fixture & { hasTip: boolean };
 
-export function ScoresClient({ fixtures }: { fixtures: Row[] }) {
+export function ScoresClient({
+  fixtures,
+  teamApiFootballIds,
+}: {
+  fixtures: Row[];
+  teamApiFootballIds: Record<string, number>;
+}) {
   const byDate = useMemo(() => {
     const grouped = new Map<string, Row[]>();
 
@@ -35,7 +41,13 @@ export function ScoresClient({ fixtures }: { fixtures: Row[] }) {
       <DateStrip dates={dates} active={active} onSelect={setActive} />
       <div>
         {rows.map((fixture) => (
-          <FixtureRow key={fixture.id} fixture={fixture} hasTip={fixture.hasTip} />
+          <FixtureRow
+            key={fixture.id}
+            fixture={fixture}
+            hasTip={fixture.hasTip}
+            homeApiFootballId={fixture.home_team ? teamApiFootballIds[fixture.home_team] : undefined}
+            awayApiFootballId={fixture.away_team ? teamApiFootballIds[fixture.away_team] : undefined}
+          />
         ))}
       </div>
     </div>

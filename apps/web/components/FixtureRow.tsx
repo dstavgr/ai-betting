@@ -7,7 +7,17 @@ import type { Fixture } from "@/lib/types";
 
 const FINISHED = new Set(["FT", "AET", "PEN"]);
 
-export function FixtureRow({ fixture, hasTip }: { fixture: Fixture; hasTip?: boolean }) {
+export function FixtureRow({
+  fixture,
+  hasTip,
+  homeApiFootballId,
+  awayApiFootballId,
+}: {
+  fixture: Fixture;
+  hasTip?: boolean;
+  homeApiFootballId?: number;
+  awayApiFootballId?: number;
+}) {
   const finished = fixture.status_short ? FINISHED.has(fixture.status_short) : false;
 
   return (
@@ -19,10 +29,12 @@ export function FixtureRow({ fixture, hasTip }: { fixture: Fixture; hasTip?: boo
       </div>
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-2 text-sm">
-          <TeamCrest name={fixture.home_team ?? "?"} /> <span className="truncate">{fixture.home_team ?? "Home"}</span>
+          <TeamCrest name={fixture.home_team ?? "?"} apiFootballId={homeApiFootballId} />{" "}
+          <span className="truncate">{fixture.home_team ?? "Home"}</span>
         </div>
         <div className="flex items-center gap-2 text-sm">
-          <TeamCrest name={fixture.away_team ?? "?"} /> <span className="truncate">{fixture.away_team ?? "Away"}</span>
+          <TeamCrest name={fixture.away_team ?? "?"} apiFootballId={awayApiFootballId} />{" "}
+          <span className="truncate">{fixture.away_team ?? "Away"}</span>
         </div>
       </div>
       <div className="shrink-0 text-right">
