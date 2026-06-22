@@ -54,7 +54,7 @@ def test_blend_probabilities_shrinks_toward_market() -> None:
     blended = blend_probabilities(
         {"home_win": 0.70, "draw": 0.20, "away_win": 0.10},
         {"home_win": 0.45, "draw": 0.30, "away_win": 0.25},
-        feature_weight=0.35,
+        model_weight=0.35,
     )
 
     assert round(sum(blended.values()), 6) == 1.0

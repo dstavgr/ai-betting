@@ -629,7 +629,7 @@ def research() -> dict[str, object]:
         backtest = backtest_baseline(session)
     return {
         "model_a": {
-            "name": "Team-form 1X2 baseline",
+            "name": "Dixon-Coles 1X2 baseline",
             "sample_size": baseline["sample_size"],
             "brier": baseline["brier"],
             "log_loss": baseline["log_loss"],

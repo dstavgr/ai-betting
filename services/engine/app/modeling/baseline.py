@@ -5,19 +5,26 @@ from datetime import UTC, datetime
 from math import exp, log
 from typing import Any, Mapping
 
-from sqlalchemy import desc, or_, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.ev import evaluate_price
 from app.core.rules import RULESET_VERSION, decide
 from app.db.models import feature_snapshot, fixture, league, odds_price, season, team
 from app.features import FEATURE_VERSION
+from app.modeling.dixon_coles import (
+    DixonColesModel,
+    fit_dixon_coles,
+    match_probabilities as dixon_coles_match_probabilities,
+)
 
-MODEL_VERSION = "team-form-market-blend-1x2-0.2.0"
+MODEL_VERSION = "dixon-coles-market-blend-1x2-0.3.0"
 MARKET_ID_1X2 = "101"
 MARKET_NAME_1X2 = "Full Time Result"
 OUTCOME_ORDER = ("101", "102", "103")
-FEATURE_MODEL_WEIGHT = 0.35
+MODEL_WEIGHT = 0.5
+DIXON_COLES_XI = 0.0019
+FINISHED_STATUSES = {"FT", "AET", "PEN"}
 MAX_MODEL_MARKET_PROBABILITY_GAP = 0.12
 MAX_CALIBRATED_EV = 0.35
 MAX_DECIMAL_ODDS = 12.0
@@ -27,6 +34,13 @@ OUTCOME_PROB_KEYS = {
     "103": "away_win",
 }
 TARGET_OUTCOME_IDS = {value: key for key, value in OUTCOME_PROB_KEYS.items()}
+DEFAULT_MODEL_PROBABILITIES = {"home_win": 1 / 3, "draw": 1 / 3, "away_win": 1 / 3}
+DixonColesCache = dict[int | None, DixonColesModel]
+DixonColesCacheSignature = tuple[int, datetime | None, datetime | None]
+_DIXON_COLES_MODEL_CACHE: dict[
+    int | None,
+    tuple[DixonColesCacheSignature, DixonColesModel],
+] = {}
 
 
 @dataclass(frozen=True)
@@ -43,8 +57,11 @@ class SelectedPrice:
 class FixtureContext:
     fixture_id: int
     kickoff_at: datetime
+    league_id: int | None
     league: str | None
     season: int | None
+    home_team_id: int | None
+    away_team_id: int | None
     home_team: str | None
     away_team: str | None
     status_short: str | None
@@ -55,6 +72,7 @@ def baseline_recommendations_for_fixture(
     fixture_id: int,
     *,
     limit: int | None = None,
+    model_cache: DixonColesCache | None = None,
 ) -> list[dict[str, Any]]:
     context = fixture_context(session, fixture_id)
     snapshot = feature_snapshot_row(session, fixture_id)
@@ -65,9 +83,9 @@ def baseline_recommendations_for_fixture(
     if set(selected_prices) != set(OUTCOME_ORDER):
         return []
 
-    feature_probabilities = estimate_1x2_probabilities(snapshot["features"])
+    model_probabilities = model_probabilities_for_context(session, context, model_cache)
     market_probabilities = market_probabilities_from_liquidity(liquidity)
-    probabilities = blend_probabilities(feature_probabilities, market_probabilities)
+    probabilities = blend_probabilities(model_probabilities, market_probabilities)
     confidence = estimate_confidence(snapshot["features"], liquidity)
     market_liquid = liquidity["bookmakers"] >= 2 and liquidity["complete_outcomes"] == len(OUTCOME_ORDER)
     recommendations = [
@@ -75,7 +93,7 @@ def baseline_recommendations_for_fixture(
             context=context,
             price=selected_prices[outcome_id],
             p_fair=probabilities[OUTCOME_PROB_KEYS[outcome_id]],
-            p_model=feature_probabilities[OUTCOME_PROB_KEYS[outcome_id]],
+            p_model=model_probabilities[OUTCOME_PROB_KEYS[outcome_id]],
             p_market=market_probabilities[OUTCOME_PROB_KEYS[outcome_id]],
             confidence=confidence,
             market_liquid=market_liquid,
@@ -88,8 +106,16 @@ def baseline_recommendations_for_fixture(
 
 def baseline_recommendations(session: Session, *, limit: int = 25) -> list[dict[str, Any]]:
     recommendations: list[dict[str, Any]] = []
+    model_cache: DixonColesCache = {}
     for fixture_id in eligible_fixture_ids(session, limit=max(limit * 4, 25)):
-        recommendations.extend(baseline_recommendations_for_fixture(session, fixture_id, limit=1))
+        recommendations.extend(
+            baseline_recommendations_for_fixture(
+                session,
+                fixture_id,
+                limit=1,
+                model_cache=model_cache,
+            )
+        )
         recommendations.sort(key=lambda row: (row["decision"] != "recommend", -row["ev_per_unit"]))
         recommendations = recommendations[:limit]
     return recommendations
@@ -97,11 +123,17 @@ def baseline_recommendations(session: Session, *, limit: int = 25) -> list[dict[
 
 def baseline_recommendation_matches(session: Session, *, limit: int = 25) -> list[dict[str, Any]]:
     matches: list[dict[str, Any]] = []
+    model_cache: DixonColesCache = {}
     for fixture_id in eligible_fixture_ids(session, limit=max(limit * 4, 25)):
         context = fixture_context(session, fixture_id)
         if context is None:
             continue
-        recommendations = baseline_recommendations_for_fixture(session, fixture_id, limit=1)
+        recommendations = baseline_recommendations_for_fixture(
+            session,
+            fixture_id,
+            limit=1,
+            model_cache=model_cache,
+        )
         if not recommendations:
             continue
         matches.append(
@@ -125,6 +157,7 @@ def evaluate_baseline(session: Session) -> dict[str, Any]:
     brier_total = 0.0
     log_loss_total = 0.0
     bucket_totals: dict[str, dict[str, float]] = {}
+    model_cache: DixonColesCache = {}
 
     for fixture_id in eligible_fixture_ids(session, limit=500):
         snapshot = feature_snapshot_row(session, fixture_id)
@@ -138,7 +171,12 @@ def evaluate_baseline(session: Session) -> dict[str, Any]:
         context = fixture_context(session, fixture_id)
         if context is None:
             continue
-        probabilities = calibrated_probabilities_for_fixture(session, context, snapshot)
+        probabilities = calibrated_probabilities_for_fixture(
+            session,
+            context,
+            snapshot,
+            model_cache=model_cache,
+        )
         true_probability = max(probabilities[str(target_result)], 1e-9)
         brier_total += sum(
             (probabilities[key] - (1.0 if key == target_result else 0.0)) ** 2
@@ -185,6 +223,7 @@ def backtest_baseline(session: Session, *, limit: int = 1000) -> dict[str, Any]:
     no_bet_reasons: dict[str, int] = {}
     ev_buckets: dict[str, dict[str, float]] = {}
     latest_bets: list[dict[str, Any]] = []
+    model_cache: DixonColesCache = {}
 
     for fixture_id in eligible_fixture_ids(session, limit=limit):
         fixtures_seen += 1
@@ -197,7 +236,11 @@ def backtest_baseline(session: Session, *, limit: int = 1000) -> dict[str, Any]:
         if target.get("available") is not True or target_result not in TARGET_OUTCOME_IDS:
             continue
 
-        recommendations = baseline_recommendations_for_fixture(session, fixture_id)
+        recommendations = baseline_recommendations_for_fixture(
+            session,
+            fixture_id,
+            model_cache=model_cache,
+        )
         if not recommendations:
             continue
         fixtures_with_odds += 1
@@ -293,26 +336,130 @@ def calibrated_probabilities_for_fixture(
     session: Session,
     context: FixtureContext,
     snapshot: Mapping[str, Any],
+    *,
+    model_cache: DixonColesCache | None = None,
 ) -> dict[str, float]:
-    feature_probabilities = estimate_1x2_probabilities(snapshot["features"])
-    selected_prices, liquidity = latest_prematch_1x2_prices(session, context.fixture_id, context.kickoff_at)
+    model_probabilities = model_probabilities_for_context(session, context, model_cache)
+    selected_prices, liquidity = latest_prematch_1x2_prices(
+        session,
+        context.fixture_id,
+        context.kickoff_at,
+    )
     if set(selected_prices) != set(OUTCOME_ORDER):
-        return feature_probabilities
-    return blend_probabilities(feature_probabilities, market_probabilities_from_liquidity(liquidity))
+        return model_probabilities
+    return blend_probabilities(model_probabilities, market_probabilities_from_liquidity(liquidity))
 
 
 def blend_probabilities(
-    feature_probabilities: Mapping[str, float],
+    model_probabilities: Mapping[str, float],
     market_probabilities: Mapping[str, float],
-    feature_weight: float = FEATURE_MODEL_WEIGHT,
+    model_weight: float = MODEL_WEIGHT,
 ) -> dict[str, float]:
+    weight = clamp(float(model_weight), 0.0, 1.0)
     blended = {
-        key: (feature_weight * float(feature_probabilities[key]))
-        + ((1.0 - feature_weight) * float(market_probabilities[key]))
+        key: (weight * float(model_probabilities[key]))
+        + ((1.0 - weight) * float(market_probabilities[key]))
         for key in ("home_win", "draw", "away_win")
     }
     total = sum(blended.values()) or 1.0
     return {key: value / total for key, value in blended.items()}
+
+
+def model_probabilities_for_context(
+    session: Session,
+    context: FixtureContext,
+    model_cache: DixonColesCache | None = None,
+) -> dict[str, float]:
+    if context.home_team_id is None or context.away_team_id is None:
+        return dict(DEFAULT_MODEL_PROBABILITIES)
+
+    league_id = int(context.league_id) if context.league_id is not None else None
+    cache = model_cache if model_cache is not None else {}
+    model = cache.get(league_id)
+    if model is None:
+        model = dixon_coles_model_for_league(session, league_id)
+        cache[league_id] = model
+    if model.match_count == 0:
+        return dict(DEFAULT_MODEL_PROBABILITIES)
+
+    probabilities = dixon_coles_match_probabilities(
+        model,
+        int(context.home_team_id),
+        int(context.away_team_id),
+    )
+    return {
+        "home_win": probabilities["home_win"],
+        "draw": probabilities["draw"],
+        "away_win": probabilities["away_win"],
+    }
+
+
+def dixon_coles_model_for_league(
+    session: Session,
+    league_id: int | None,
+) -> DixonColesModel:
+    signature = finished_fixture_signature(session, league_id)
+    cached = _DIXON_COLES_MODEL_CACHE.get(league_id)
+    if cached is not None and cached[0] == signature:
+        return cached[1]
+
+    model = fit_dixon_coles(finished_fixture_matches(session, league_id), xi=DIXON_COLES_XI)
+    _DIXON_COLES_MODEL_CACHE[league_id] = (signature, model)
+    return model
+
+
+def finished_fixture_signature(
+    session: Session,
+    league_id: int | None,
+) -> DixonColesCacheSignature:
+    row = session.execute(
+        select(
+            func.count(),
+            func.max(fixture.c.kickoff_at),
+            func.max(fixture.c.updated_at),
+        ).where(*finished_fixture_conditions(league_id))
+    ).one()
+    return int(row[0] or 0), row[1], row[2]
+
+
+def finished_fixture_matches(
+    session: Session,
+    league_id: int | None,
+) -> list[tuple[int, int, int, int, datetime]]:
+    rows = session.execute(
+        select(
+            fixture.c.home_team_id,
+            fixture.c.away_team_id,
+            fixture.c.goals_home,
+            fixture.c.goals_away,
+            fixture.c.kickoff_at,
+        )
+        .where(*finished_fixture_conditions(league_id))
+        .order_by(fixture.c.kickoff_at, fixture.c.id)
+    ).mappings()
+    return [
+        (
+            int(row["home_team_id"]),
+            int(row["away_team_id"]),
+            int(row["goals_home"]),
+            int(row["goals_away"]),
+            row["kickoff_at"],
+        )
+        for row in rows
+    ]
+
+
+def finished_fixture_conditions(league_id: int | None) -> list[Any]:
+    conditions: list[Any] = [
+        fixture.c.home_team_id.is_not(None),
+        fixture.c.away_team_id.is_not(None),
+        fixture.c.goals_home.is_not(None),
+        fixture.c.goals_away.is_not(None),
+        fixture.c.status_short.in_(FINISHED_STATUSES),
+    ]
+    if league_id is not None:
+        conditions.append(fixture.c.league_id == league_id)
+    return conditions
 
 
 def market_probabilities_from_liquidity(liquidity: Mapping[str, Any]) -> dict[str, float]:
@@ -350,7 +497,10 @@ def build_recommendation(
     if reason:
         explanation = f"No bet: {reason.replace('_', ' ').lower()}."
     else:
-        explanation = "Research signal passed the calibrated team-form, market-prior, EV, and confidence checks."
+        explanation = (
+            "Research signal passed the Dixon-Coles model, market-prior, EV, "
+            "and confidence checks."
+        )
 
     return {
         "fixture_id": context.fixture_id,
@@ -395,6 +545,9 @@ def fixture_context(session: Session, fixture_id: int) -> FixtureContext | None:
         select(
             fixture.c.id,
             fixture.c.kickoff_at,
+            fixture.c.league_id,
+            fixture.c.home_team_id,
+            fixture.c.away_team_id,
             league.c.name.label("league"),
             season.c.year.label("season"),
             home_team.c.name.label("home_team"),
@@ -414,8 +567,11 @@ def fixture_context(session: Session, fixture_id: int) -> FixtureContext | None:
     return FixtureContext(
         fixture_id=row["id"],
         kickoff_at=row["kickoff_at"],
+        league_id=row["league_id"],
         league=row["league"],
         season=row["season"],
+        home_team_id=row["home_team_id"],
+        away_team_id=row["away_team_id"],
         home_team=row["home_team"],
         away_team=row["away_team"],
         status_short=row["status_short"],

@@ -29,7 +29,6 @@ dependencies = [
 [project.optional-dependencies]
 # Roadmap — not yet used by any code. Install with: pip install -e '.[ml]'
 ml = [
-  "numpy>=2.0",
   "pandas>=2.2",
   "scikit-learn>=1.5",
   "statsmodels>=0.14"
