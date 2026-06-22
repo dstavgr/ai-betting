@@ -3,6 +3,7 @@ import { Barlow, Barlow_Condensed } from "next/font/google";
 
 import { BottomNav, SidebarNav } from "@/components/BottomNav";
 import { EngineStatusBanner } from "@/components/EngineStatusBanner";
+import { LeagueSwitcher } from "@/components/LeagueSwitcher";
 
 import "../styles/globals.css";
 
@@ -38,8 +39,7 @@ export default async function RootLayout({
       <body className={`${barlow.variable} ${barlowCondensed.variable} font-sans antialiased`}>
         <div className="mx-auto flex min-h-screen max-w-2xl flex-col bg-background text-foreground md:max-w-6xl">
           <header className="sticky top-0 z-40 border-b border-border bg-card/95 px-4 py-3 shadow-sm backdrop-blur md:px-6">
-            <span className="block font-display text-lg font-semibold leading-none tracking-normal">Super League 1</span>
-            <span className="block text-xs text-muted-foreground">2025/26 · research, not advice</span>
+            <LeagueSwitcher />
           </header>
           <EngineStatusBanner />
           <div className="flex flex-1 md:gap-4 md:px-6 md:py-5 lg:gap-6">

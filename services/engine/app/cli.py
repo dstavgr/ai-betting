@@ -86,7 +86,7 @@ def main() -> None:
         help="Sync OddsPAPI fixtures and attempt to map them to local fixtures.",
     )
     oddspapi_fixtures.add_argument("--sport-id", type=int, default=settings.oddspapi_default_sport_id)
-    oddspapi_fixtures.add_argument("--tournament-id")
+    oddspapi_fixtures.add_argument("--tournament-id", default=settings.oddspapi_default_tournament_id)
     oddspapi_fixtures.add_argument("--from-date", dest="from_date")
     oddspapi_fixtures.add_argument("--to-date", dest="to_date")
     oddspapi_fixtures.add_argument("--status-id", type=int)
@@ -99,7 +99,7 @@ def main() -> None:
         "sync-tournament-odds",
         help="Sync current odds for all fixtures in one OddsPAPI tournament.",
     )
-    oddspapi_tournament_odds.add_argument("--tournament-id", required=True)
+    oddspapi_tournament_odds.add_argument("--tournament-id", default=settings.oddspapi_default_tournament_id)
     oddspapi_tournament_odds.add_argument("--bookmakers", default=settings.oddspapi_default_bookmakers)
     oddspapi_tournament_odds.add_argument("--language", default="en")
     oddspapi_tournament_odds.add_argument("--verbosity", type=int, default=3)
@@ -131,7 +131,7 @@ def main() -> None:
         "sync-historical-mapped-odds",
         help="Sync historical odds for already-mapped OddsPAPI fixtures.",
     )
-    oddspapi_historical_mapped_odds.add_argument("--tournament-id")
+    oddspapi_historical_mapped_odds.add_argument("--tournament-id", default=settings.oddspapi_default_tournament_id)
     oddspapi_historical_mapped_odds.add_argument("--bookmakers", default=settings.oddspapi_default_bookmakers)
     oddspapi_historical_mapped_odds.add_argument("--limit", type=int, default=10)
     oddspapi_historical_mapped_odds.add_argument("--id")

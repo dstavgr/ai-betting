@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { DateStrip } from "@/components/DateStrip";
 import { FixtureRow } from "@/components/FixtureRow";
+import { defaultLeague } from "@/lib/leagues";
 import type { Fixture } from "@/lib/types";
 
 type Row = Fixture & { hasTip: boolean };
@@ -44,7 +45,7 @@ export function ScoresClient({
           <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
             SL
           </span>
-          <span className="font-display text-sm font-semibold leading-none text-foreground">Super League 1</span>
+          <span className="font-display text-sm font-semibold leading-none text-foreground">{defaultLeague.name}</span>
         </div>
         <div className="lg:grid lg:grid-cols-2">
           {rows.map((fixture) => (
