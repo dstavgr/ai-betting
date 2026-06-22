@@ -73,13 +73,13 @@ odds-api-io-selected-bookmakers:
 	$(COMPOSE) run --rm engine python -m app.cli odds-api-io selected-bookmakers
 
 odds-api-io-sync-events:
-	$(COMPOSE) run --rm engine python -m app.cli odds-api-io sync-events --sport "$${SPORT:-football}" --league "$${LEAGUE:?Set LEAGUE=league-slug}" --from-time "$${FROM_TIME:-}" --to-time "$${TO_TIME:-}" --limit "$${LIMIT:-500}"
+	$(COMPOSE) run --rm engine python -m app.cli odds-api-io sync-events --sport "$${SPORT:-football}" --league "$${LEAGUE:-greece-super-league}" --from-time "$${FROM_TIME:-}" --to-time "$${TO_TIME:-}" --limit "$${LIMIT:-500}"
 
 odds-api-io-sync-prematch-window:
-	$(COMPOSE) run --rm engine python -m app.cli odds-api-io sync-prematch-window --sport "$${SPORT:-football}" --league "$${LEAGUE:?Set LEAGUE=league-slug}" --from-time "$${FROM_TIME:-}" --to-time "$${TO_TIME:-}" --bookmakers "$${BOOKMAKERS:-Novibet,Stoiximan}" --limit "$${LIMIT:-100}" --max-requests "$${MAX_REQUESTS:-100}"
+	$(COMPOSE) run --rm engine python -m app.cli odds-api-io sync-prematch-window --sport "$${SPORT:-football}" --league "$${LEAGUE:-greece-super-league}" --from-time "$${FROM_TIME:-}" --to-time "$${TO_TIME:-}" --bookmakers "$${BOOKMAKERS:-Novibet,Stoiximan}" --limit "$${LIMIT:-100}" --batch-size "$${BATCH_SIZE:-10}" --max-requests "$${MAX_REQUESTS:-100}"
 
 odds-api-io-sync-historical-events:
-	$(COMPOSE) run --rm engine python -m app.cli odds-api-io sync-historical-events --sport "$${SPORT:-football}" --league "$${LEAGUE:?Set LEAGUE=league-slug}" --from-time "$${FROM_TIME:?Set FROM_TIME=2026-01-01T00:00:00Z}" --to-time "$${TO_TIME:?Set TO_TIME=2026-01-31T23:59:59Z}"
+	$(COMPOSE) run --rm engine python -m app.cli odds-api-io sync-historical-events --sport "$${SPORT:-football}" --league "$${LEAGUE:-greece-super-league}" --from-time "$${FROM_TIME:?Set FROM_TIME=2026-01-01T00:00:00Z}" --to-time "$${TO_TIME:?Set TO_TIME=2026-01-31T23:59:59Z}"
 
 odds-api-io-sync-historical-mapped-odds:
-	$(COMPOSE) run --rm engine python -m app.cli odds-api-io sync-historical-mapped-odds --league "$${LEAGUE:-}" --bookmakers "$${BOOKMAKERS:-Novibet,Stoiximan}" --limit "$${LIMIT:-20}" --max-requests "$${MAX_REQUESTS:-100}"
+	$(COMPOSE) run --rm engine python -m app.cli odds-api-io sync-historical-mapped-odds --league "$${LEAGUE:-greece-super-league}" --bookmakers "$${BOOKMAKERS:-Novibet,Stoiximan}" --limit "$${LIMIT:-20}" --max-requests "$${MAX_REQUESTS:-100}"

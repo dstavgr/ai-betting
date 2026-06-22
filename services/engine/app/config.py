@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     odds_api_io_requests_per_hour: int = Field(default=100)
     odds_api_io_default_sport: str = Field(default="football")
     odds_api_io_default_bookmakers: str = Field(default="Novibet,Stoiximan")
-    odds_api_io_default_league: str = Field(default="")
+    odds_api_io_default_league: str = Field(default="greece-super-league")
     odds_api_io_event_ttl_seconds: int = Field(default=600)
     odds_api_io_odds_ttl_seconds: int = Field(default=900)
     llm_provider: str = Field(default="deepseek")

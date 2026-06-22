@@ -8,5 +8,9 @@
 # Daily 06:15 UTC — sync fixtures/results, rebuild features, map upcoming odds fixtures
 15 6 * * *  /usr/bin/flock -n /tmp/ai-betting-daily.lock /home/ubuntu/ai-betting/deploy/cron/ingest.sh daily >> /home/ubuntu/logs/ai-betting-ingest.log 2>&1
 
-# Every 3 hours (:05) — snapshot current 1X2 odds for the Greek Super League
+# Every 3 hours (:05) — snapshot OddsPapi 1X2 odds for the Greek Super League
 5 */3 * * * /usr/bin/flock -n /tmp/ai-betting-odds.lock /home/ubuntu/ai-betting/deploy/cron/ingest.sh odds >> /home/ubuntu/logs/ai-betting-ingest.log 2>&1
+
+# Twice hourly (:17, :47) — snapshot Odds-API.io 1X2 odds for Novibet/Stoiximan.
+# The script caps each run at 40 requests, keeping the worst case below 100/hour.
+17,47 * * * * /usr/bin/flock -n /tmp/ai-betting-oddsapi.lock /home/ubuntu/ai-betting/deploy/cron/ingest.sh oddsapi >> /home/ubuntu/logs/ai-betting-ingest.log 2>&1

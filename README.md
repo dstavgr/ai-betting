@@ -22,8 +22,7 @@ Greek Super League first. Deployed at https://bet.stav.gr.
 ## How a recommendation is built
 
 1. **Ingest** fixtures/teams/events/stats (API-Football) and 1X2 odds from
-   bookmakers via **OddsPapi**. (An odds-api.io path also exists in the code but
-   currently has no ingested data; OddsPapi is the live source.)
+   bookmakers via **OddsPapi** plus **Odds-API.io** for Novibet/Stoiximan.
 2. **Feature snapshots** per fixture (team form, venue splits, data-quality flags).
 3. **Model**: a deterministic team-form 1X2 estimate is blended with the no-vig
    market consensus, then scored for EV / edge / quarter-Kelly stake.
@@ -56,6 +55,8 @@ logged to `~/logs/ai-betting-ingest.log`.
   rebuild feature snapshots, map upcoming OddsPapi fixtures.
 - **Every 3 hours** — snapshot current 1X2 odds for the Greek Super League
   (OddsPapi tournament 185, bookmaker pinnacle).
+- **Twice hourly** — snapshot Odds-API.io prematch 1X2 odds for the Greek Super
+  League (`greece-super-league`, Novibet/Stoiximan), capped at 40 requests/run.
 
 ### Manual / one-off commands
 
@@ -69,6 +70,10 @@ make oddspapi-status
 make oddspapi-sync-metadata
 TOURNAMENT_ID=185 make oddspapi-sync-tournament-odds          # current odds
 TOURNAMENT_ID=185 make oddspapi-sync-historical-mapped-odds   # closing odds
+
+make odds-api-io-selected-bookmakers
+make odds-api-io-sync-prematch-window
+make odds-api-io-sync-historical-mapped-odds
 ```
 
 Run `grep -E '^[a-z].*:' Makefile` for the full target list.
