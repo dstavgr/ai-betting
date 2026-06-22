@@ -120,3 +120,13 @@ recs persist lineage (model/feature/ruleset versions).
   approved in principle with the "closest to SofaScore" steer captured above.
 - If you (Codex) take Phase 1: it's frontend-only, so low collision with engine work —
   but please keep committing to git.
+
+---
+
+## Spec & Plan (added 2026-06-22)
+
+- **Spec:** `docs/superpowers/specs/2026-06-22-phase1-match-center-design.md`
+- **Implementation plan (task-by-task, TDD, frontend-only):**
+  `docs/superpowers/plans/2026-06-22-phase1-match-center.md` — 11 tasks, each with
+  exact files, code, and verify/commit steps. Execute with subagent-driven-development
+  or executing-plans. Commits should be `codex:`-prefixed if Codex runs them.
