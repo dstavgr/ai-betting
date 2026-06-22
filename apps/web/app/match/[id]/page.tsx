@@ -6,19 +6,32 @@ import { RecCard } from "@/components/RecCard";
 import { StatsBars } from "@/components/StatsBars";
 import { TeamCrest } from "@/components/TeamCrest";
 import { WinProbabilityBar } from "@/components/WinProbabilityBar";
+import { FormGuide } from "@/components/widgets/FormGuide";
+import { HeadToHead } from "@/components/widgets/HeadToHead";
+import { MatchFacts } from "@/components/widgets/MatchFacts";
+import { OddsRow } from "@/components/widgets/OddsRow";
 import { SectionCard } from "@/components/ui/section-card";
-import { getFixture, getFixtureOpportunity, getFixtureRecommendations, getTeams } from "@/lib/api";
+import {
+  getFixture,
+  getFixtureOdds,
+  getFixtureOpportunity,
+  getFixtureRecommendations,
+  getSeasonFixtures,
+  getTeams,
+} from "@/lib/api";
 import { score, shortDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
 export default async function MatchPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [fixture, opportunity, recommendations, teams] = await Promise.all([
+  const [fixture, opportunity, recommendations, teams, seasonFixtures, odds] = await Promise.all([
     getFixture(id),
     getFixtureOpportunity(id),
     getFixtureRecommendations(id),
     getTeams(),
+    getSeasonFixtures(),
+    getFixtureOdds(id),
   ]);
 
   if (!fixture) {
@@ -63,12 +76,21 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           <>
             <WinProbabilityBar recommendations={recommendations} home={home} away={away} />
             <RecCard rec={opportunity?.recommendation ?? recommendations[0] ?? null} />
-            {opportunity ? (
-              <SectionCard className="space-y-2 text-sm leading-6">
-                <p>{opportunity.interesting_fact}</p>
-                <p className="text-muted-foreground">{opportunity.historical_angle}</p>
-              </SectionCard>
-            ) : null}
+            <OddsRow odds={odds} />
+            <SectionCard title="Form" className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="min-w-0 space-y-2">
+                  <div className="truncate text-sm font-medium">{home}</div>
+                  <FormGuide fixtures={seasonFixtures} teamName={home} />
+                </div>
+                <div className="min-w-0 space-y-2">
+                  <div className="truncate text-sm font-medium">{away}</div>
+                  <FormGuide fixtures={seasonFixtures} teamName={away} />
+                </div>
+              </div>
+            </SectionCard>
+            <HeadToHead fixtures={seasonFixtures} homeName={home} awayName={away} />
+            <MatchFacts fixture={fixture} />
           </>
         }
         stats={<StatsBars stats={fixture.team_statistics} />}

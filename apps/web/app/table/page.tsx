@@ -20,7 +20,7 @@ export default async function TablePage() {
         <p className="py-10 text-center text-sm text-muted-foreground">No completed matches yet.</p>
       ) : (
         <>
-          <StandingsTable rows={rows} teamApiFootballIds={teamApiFootballIds} />
+          <StandingsTable rows={rows} fixtures={fixtures} teamApiFootballIds={teamApiFootballIds} />
           <p className="text-[11px] text-muted-foreground">
             Computed from results; excludes any official point deductions.
           </p>
