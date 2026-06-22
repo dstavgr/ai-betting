@@ -1,0 +1,43 @@
+"use client";
+
+import { useMemo, useState } from "react";
+
+import { DateStrip } from "@/components/DateStrip";
+import { FixtureRow } from "@/components/FixtureRow";
+import type { Fixture } from "@/lib/types";
+
+type Row = Fixture & { hasTip: boolean };
+
+export function ScoresClient({ fixtures }: { fixtures: Row[] }) {
+  const byDate = useMemo(() => {
+    const grouped = new Map<string, Row[]>();
+
+    for (const fixture of fixtures) {
+      const key = fixture.kickoff_at.slice(0, 10);
+      const rows = grouped.get(key) ?? [];
+      rows.push(fixture);
+      grouped.set(key, rows);
+    }
+
+    return [...grouped.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [fixtures]);
+
+  const dates = byDate.map(([date]) => date);
+  const [active, setActive] = useState(dates[dates.length - 1] ?? "");
+  const rows = byDate.find(([date]) => date === active)?.[1] ?? [];
+
+  if (dates.length === 0) {
+    return <p className="py-10 text-center text-sm text-muted-foreground">No fixtures yet. The new season starts in August.</p>;
+  }
+
+  return (
+    <div>
+      <DateStrip dates={dates} active={active} onSelect={setActive} />
+      <div>
+        {rows.map((fixture) => (
+          <FixtureRow key={fixture.id} fixture={fixture} hasTip={fixture.hasTip} />
+        ))}
+      </div>
+    </div>
+  );
+}
