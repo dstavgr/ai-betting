@@ -1,0 +1,13 @@
+.git
+.codex
+.agents
+node_modules
+apps/web/node_modules
+apps/web/.next
+services/engine/.venv
+services/engine/__pycache__
+services/engine/.pytest_cache
+**/__pycache__
+**/.DS_Store
+*.pyc
+.env

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Bet analytics mark">
+  <rect width="48" height="48" rx="10" fill="#0b1115"/>
+  <path d="M13 31.5 21.5 18l6.2 8.4L35 14.5" fill="none" stroke="#55d399" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="35" cy="14.5" r="3" fill="#f7c948"/>
+</svg>

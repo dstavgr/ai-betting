@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "betting-engine"
+version = "0.1.0"
+description = "FastAPI engine for soccer betting analytics research."
+requires-python = ">=3.12"
+dependencies = [
+  "alembic>=1.13",
+  "apscheduler>=3.10",
+  "fastapi>=0.115",
+  "httpx>=0.27",
+  "litellm>=1.52",
+  "numpy>=2.0",
+  "pandas>=2.2",
+  "pydantic>=2.9",
+  "pydantic-settings>=2.5",
+  "psycopg[binary]>=3.2",
+  "scikit-learn>=1.5",
+  "sqlalchemy>=2.0",
+  "statsmodels>=0.14",
+  "uvicorn[standard]>=0.30"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "pytest-asyncio>=0.24",
+  "ruff>=0.7"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
