@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
-import { MainNav } from "@/components/main-nav";
+import { BottomNav } from "@/components/BottomNav";
 
 import "../styles/globals.css";
 
 export const metadata: Metadata = {
-  title: "Bet Analytics",
-  description: "Soccer betting analytics for research and education.",
+  title: "Bet Analytics — Greek Super League",
+  description: "Soccer match-center and betting research for the Greek Super League.",
 };
 
 export default function RootLayout({
@@ -18,35 +17,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-sans antialiased">
-        <div className="min-h-screen bg-background text-foreground">
-          <header className="border-b border-border bg-white">
-            <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <LinkBrand />
-              <MainNav />
-            </div>
+        <div className="mx-auto flex min-h-screen max-w-2xl flex-col bg-background text-foreground">
+          <header className="sticky top-0 z-40 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
+            <span className="block text-sm font-semibold">Super League 1</span>
+            <span className="block text-xs text-muted-foreground">2025/26 · research, not advice</span>
           </header>
-          <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
-          <footer className="border-t border-border bg-white">
-            <div className="mx-auto max-w-6xl px-4 py-4 text-xs text-muted-foreground">
-              Research and education only. Not betting advice. No outcome is guaranteed. 21+.
-            </div>
+          <main className="flex-1 px-4 py-4 pb-24">{children}</main>
+          <footer className="px-4 pb-24 pt-2 text-center text-[11px] text-muted-foreground">
+            Research and education only. Not betting advice. 21+.
           </footer>
+          <BottomNav />
         </div>
       </body>
     </html>
-  );
-}
-
-function LinkBrand() {
-  return (
-    <Link href="/" className="flex items-center gap-3">
-      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-        BA
-      </span>
-      <span className="leading-tight">
-        <span className="block text-sm font-semibold">Bet Analytics</span>
-        <span className="block text-xs text-muted-foreground">Greek Super League MVP</span>
-      </span>
-    </Link>
   );
 }
