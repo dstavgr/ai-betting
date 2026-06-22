@@ -28,6 +28,7 @@ from app.db.models import (
 )
 from app.db.session import SessionLocal
 from app.features import FEATURE_VERSION
+from app.live import HALFTIME_STATUSES, LIVE_STATUSES, LiveState, live_state_from_fixture
 from app.modeling import (
     backtest_baseline,
     baseline_recommendation_matches,
@@ -269,6 +270,40 @@ class BacktestSummary(BaseModel):
     no_bet_reasons: dict[str, int]
     ev_buckets: list[dict[str, str | int | float]]
     latest_bets: list[dict[str, str | int | float | bool]]
+
+
+@app.get("/live", response_model=list[LiveState])
+def live() -> list[LiveState]:
+    with SessionLocal() as session:
+        rows = session.execute(
+            select(
+                fixture.c.id.label("fixture_id"),
+                fixture.c.status_short,
+                fixture.c.goals_home,
+                fixture.c.goals_away,
+            )
+            .where(fixture.c.status_short.in_(sorted(LIVE_STATUSES | HALFTIME_STATUSES)))
+            .order_by(fixture.c.kickoff_at, fixture.c.id)
+        ).mappings()
+        return [live_state_from_fixture(row) for row in rows]
+
+
+@app.get("/fixtures/{fixture_id}/live", response_model=LiveState)
+def fixture_live(fixture_id: int) -> LiveState:
+    with SessionLocal() as session:
+        row = session.execute(
+            select(
+                fixture.c.id.label("fixture_id"),
+                fixture.c.status_short,
+                fixture.c.goals_home,
+                fixture.c.goals_away,
+            ).where(fixture.c.id == fixture_id)
+        ).mappings().one_or_none()
+
+        if row is None:
+            raise HTTPException(status_code=404, detail="Fixture not found")
+
+        return live_state_from_fixture(row)
 
 
 @app.get("/health", response_model=HealthResponse)
