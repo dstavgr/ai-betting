@@ -14,6 +14,7 @@ from app.modeling.dixon_coles import (
     match_probabilities,
     score_matrix,
 )
+from app.modeling.walkforward import evaluate_walkforward
 
 __all__ = [
     "DixonColesModel",
@@ -24,6 +25,7 @@ __all__ = [
     "baseline_recommendations_for_fixture",
     "dixon_coles_tau",
     "evaluate_baseline",
+    "evaluate_walkforward",
     "estimate_1x2_probabilities",
     "fit_dixon_coles",
     "match_probabilities",

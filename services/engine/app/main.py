@@ -34,6 +34,7 @@ from app.modeling import (
     baseline_recommendations,
     baseline_recommendations_for_fixture,
     evaluate_baseline,
+    evaluate_walkforward,
 )
 from app.modeling.opportunities import match_opportunities, match_opportunity
 
@@ -638,6 +639,26 @@ def research() -> dict[str, object]:
         "model_b": {"name": "Context model", "brier": "pending", "log_loss": "pending", "clv": "pending"},
         "calibration": baseline["calibration"],
         "backtest": backtest,
+    }
+
+
+@app.get("/research/walkforward")
+def research_walkforward(limit: int = 1000) -> dict[str, object]:
+    with SessionLocal() as session:
+        result = evaluate_walkforward(session, limit=min(limit, 5000))
+    backtest = result["backtest"]
+    return {
+        "brier": result["brier"],
+        "log_loss": result["log_loss"],
+        "sample_size": result["sample_size"],
+        "calibration": result["calibration"],
+        "backtest": {
+            "bets": backtest["bets"],
+            "hit_rate": backtest["hit_rate"],
+            "roi": backtest["roi"],
+            "flat_profit": backtest["flat_profit"],
+            "avg_ev": backtest["avg_ev"],
+        },
     }
 
 
