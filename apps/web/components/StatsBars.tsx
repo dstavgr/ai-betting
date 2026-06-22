@@ -1,4 +1,6 @@
 import type { TeamMatchStats } from "@/lib/types";
+import { SectionCard } from "@/components/ui/section-card";
+import { StatBar } from "@/components/ui/stat-bar";
 
 export function StatsBars({ stats }: { stats: TeamMatchStats[] }) {
   if (stats.length < 2) {
@@ -15,26 +17,24 @@ export function StatsBars({ stats }: { stats: TeamMatchStats[] }) {
   }
 
   return (
-    <div className="space-y-4 rounded-lg border border-border bg-white p-4">
+    <SectionCard className="space-y-4">
       {keys.map((key) => {
         const homeValue = num(home.statistics[key]);
         const awayValue = num(away.statistics[key]);
-        const total = homeValue + awayValue || 1;
+        const isPercent = [home.statistics[key], away.statistics[key]].some((value) =>
+          String(value ?? "").includes("%"),
+        );
 
         return (
-          <div key={key} className="space-y-1.5">
-            <div className="grid grid-cols-[64px_1fr_64px] items-center gap-2 text-xs">
-              <span className="truncate font-medium">{String(home.statistics[key] ?? "-")}</span>
-              <span className="truncate text-center text-muted-foreground">{key}</span>
-              <span className="truncate text-right font-medium">{String(away.statistics[key] ?? "-")}</span>
-            </div>
-            <div className="flex h-1.5 overflow-hidden rounded-full bg-muted">
-              <div className="bg-primary" style={{ width: `${(homeValue / total) * 100}%` }} />
-              <div className="bg-destructive" style={{ width: `${(awayValue / total) * 100}%` }} />
-            </div>
-          </div>
+          <StatBar
+            key={key}
+            label={key}
+            homeValue={homeValue}
+            awayValue={awayValue}
+            formatValue={(value) => `${value}${isPercent ? "%" : ""}`}
+          />
         );
       })}
-    </div>
+    </SectionCard>
   );
 }

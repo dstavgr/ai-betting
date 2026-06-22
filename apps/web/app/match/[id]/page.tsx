@@ -6,6 +6,7 @@ import { RecCard } from "@/components/RecCard";
 import { StatsBars } from "@/components/StatsBars";
 import { TeamCrest } from "@/components/TeamCrest";
 import { WinProbabilityBar } from "@/components/WinProbabilityBar";
+import { SectionCard } from "@/components/ui/section-card";
 import { getFixture, getFixtureOpportunity, getFixtureRecommendations, getTeams } from "@/lib/api";
 import { score, shortDate } from "@/lib/format";
 
@@ -44,7 +45,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
             <span className="truncate">{home}</span>
             <TeamCrest name={home} apiFootballId={teamApiFootballIds.get(home)} size={28} />
           </span>
-          <span className="rounded-md bg-muted px-3 py-1 font-mono text-lg font-bold">
+          <span className="numeric rounded-md bg-muted px-3 py-1 font-display text-2xl font-bold leading-none">
             {score(fixture.goals_home, fixture.goals_away)}
           </span>
           <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
@@ -63,10 +64,10 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
             <WinProbabilityBar recommendations={recommendations} home={home} away={away} />
             <RecCard rec={opportunity?.recommendation ?? recommendations[0] ?? null} />
             {opportunity ? (
-              <div className="space-y-2 rounded-lg border border-border bg-white p-4 text-sm leading-6">
+              <SectionCard className="space-y-2 text-sm leading-6">
                 <p>{opportunity.interesting_fact}</p>
                 <p className="text-muted-foreground">{opportunity.historical_angle}</p>
-              </div>
+              </SectionCard>
             ) : null}
           </>
         }

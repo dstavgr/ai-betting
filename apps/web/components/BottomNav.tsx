@@ -17,7 +17,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 border-t border-border bg-background/95 backdrop-blur md:mx-auto md:max-w-2xl"
+      className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 border-t border-border bg-card/95 shadow-sm backdrop-blur md:mx-auto md:max-w-2xl"
       aria-label="Primary"
     >
       {tabs.map((tab) => {
@@ -28,7 +28,7 @@ export function BottomNav() {
           <Link
             key={tab.href}
             href={tab.href}
-            className={`flex flex-col items-center gap-1 py-2 text-xs ${
+            className={`flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors ${
               active ? "text-primary" : "text-muted-foreground"
             }`}
           >

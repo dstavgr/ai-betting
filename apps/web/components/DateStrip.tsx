@@ -41,7 +41,7 @@ export function DateStrip({
           className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
             date === active
               ? "border-primary bg-primary text-primary-foreground shadow-sm"
-              : "border-border bg-white text-muted-foreground hover:bg-muted/70"
+              : "border-border bg-card text-muted-foreground hover:bg-muted/70"
           }`}
           type="button"
         >

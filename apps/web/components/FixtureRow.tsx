@@ -53,7 +53,7 @@ export function FixtureRow({
       </div>
       <div className="flex min-w-10 shrink-0 flex-col items-end gap-1 text-right">
         {finished ? (
-          <div className="space-y-1 font-mono text-sm font-bold leading-none text-foreground">
+          <div className="numeric space-y-1 font-display text-lg font-bold leading-none text-foreground">
             <div>{fixture.goals_home ?? "-"}</div>
             <div>{fixture.goals_away ?? "-"}</div>
           </div>

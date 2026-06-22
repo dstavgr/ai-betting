@@ -38,11 +38,11 @@ export default async function ResearchPage() {
               </div>
               <div className="grid gap-2">
                 {research.backtest.ev_buckets.map((bucket) => (
-                  <div key={bucket.bucket} className="grid gap-2 rounded-md border border-border bg-white p-3 text-sm md:grid-cols-[80px_1fr_96px_96px] md:items-center">
+                  <div key={bucket.bucket} className="grid gap-2 rounded-md border border-border bg-card p-3 text-sm md:grid-cols-[80px_1fr_96px_96px] md:items-center">
                     <span className="font-semibold">{bucket.bucket}</span>
                     <span className="text-muted-foreground">{bucket.bets} bets</span>
                     <span>{pct(bucket.hit_rate)}</span>
-                    <span className={bucket.roi >= 0 ? "font-semibold text-emerald-700" : "font-semibold text-amber-700"}>{signedPct(bucket.roi)}</span>
+                    <span className="font-semibold text-foreground">{signedPct(bucket.roi)}</span>
                   </div>
                 ))}
               </div>
@@ -77,9 +77,9 @@ export default async function ResearchPage() {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-border bg-white p-3">
+    <div className="rounded-md border border-border bg-card p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 font-semibold">{value}</p>
+      <p className="numeric mt-1 font-display text-lg font-semibold">{value}</p>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { SectionCard, SectionHeader } from "@/components/ui/section-card";
 import { pct } from "@/lib/format";
 import type { Recommendation } from "@/lib/types";
 
@@ -20,12 +21,12 @@ export function WinProbabilityBar({
   }
 
   return (
-    <div className="space-y-2 rounded-lg border border-border bg-white p-4">
-      <div className="text-xs text-muted-foreground">Fair win probability (research) - model + market blend</div>
+    <SectionCard className="space-y-2">
+      <SectionHeader label="Fair win probability" action="Model + market blend" />
       <div className="flex h-3 overflow-hidden rounded-full bg-muted">
         <div className="bg-primary" style={{ width: `${homeP * 100}%` }} />
-        <div className="bg-muted-foreground/40" style={{ width: `${drawP * 100}%` }} />
-        <div className="bg-destructive" style={{ width: `${awayP * 100}%` }} />
+        <div className="bg-draw" style={{ width: `${drawP * 100}%` }} />
+        <div className="bg-loss" style={{ width: `${awayP * 100}%` }} />
       </div>
       <div className="grid grid-cols-3 gap-2 text-[11px] text-muted-foreground">
         <span className="truncate">
@@ -36,6 +37,6 @@ export function WinProbabilityBar({
           {away} {pct(awayP, 0)}
         </span>
       </div>
-    </div>
+    </SectionCard>
   );
 }

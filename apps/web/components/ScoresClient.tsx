@@ -39,12 +39,12 @@ export function ScoresClient({
   return (
     <div>
       <DateStrip dates={dates} active={active} onSelect={setActive} />
-      <section className="overflow-hidden rounded-md border border-border bg-white">
+      <section className="overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-sm">
         <div className="flex items-center gap-2 border-b border-border bg-muted/45 px-3 py-2">
           <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
             SL
           </span>
-          <span className="text-xs font-semibold text-foreground">Super League 1</span>
+          <span className="font-display text-sm font-semibold leading-none text-foreground">Super League 1</span>
         </div>
         {rows.map((fixture) => (
           <FixtureRow

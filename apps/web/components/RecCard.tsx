@@ -36,7 +36,7 @@ export function RecCard({ rec }: { rec: Recommendation | null }) {
       <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-4">
         <span>EV {signedPct(rec.ev_per_unit)}</span>
         <span>Edge {signedPct(rec.edge)}</span>
-        <span>Fair {pct(rec.p_fair)}</span>
+        <span>Fair win probability {pct(rec.p_fair)}</span>
         <span>Conf {pct(rec.confidence, 0)}</span>
       </div>
       <p className="text-sm leading-6 text-muted-foreground">{rec.explanation}</p>

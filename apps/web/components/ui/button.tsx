@@ -19,7 +19,7 @@ export function Button({ asChild, className, variant = "primary", size = "md", .
         size === "md" && "h-9 px-3",
         size === "lg" && "h-10 px-4",
         size === "icon" && "h-9 w-9",
-        variant === "primary" && "bg-primary text-primary-foreground hover:bg-primary/90",
+        variant === "primary" && "bg-primary text-primary-foreground hover:bg-primary-hover",
         variant === "ghost" && "text-muted-foreground hover:bg-muted hover:text-foreground",
         variant === "outline" && "border border-border bg-background hover:bg-muted",
         className,
