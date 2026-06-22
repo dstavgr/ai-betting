@@ -1,9 +1,24 @@
 import type { Metadata } from "next";
+import { Barlow, Barlow_Condensed } from "next/font/google";
 
 import { BottomNav } from "@/components/BottomNav";
 import { EngineStatusBanner } from "@/components/EngineStatusBanner";
 
 import "../styles/globals.css";
+
+const barlow = Barlow({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const barlowCondensed = Barlow_Condensed({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-display",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Bet Analytics — Greek Super League",
@@ -20,10 +35,10 @@ export default async function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="font-sans antialiased">
+      <body className={`${barlow.variable} ${barlowCondensed.variable} font-sans antialiased`}>
         <div className="mx-auto flex min-h-screen max-w-2xl flex-col bg-background text-foreground">
-          <header className="sticky top-0 z-40 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
-            <span className="block text-sm font-semibold">Super League 1</span>
+          <header className="sticky top-0 z-40 border-b border-border bg-card/95 px-4 py-3 shadow-sm backdrop-blur">
+            <span className="block font-display text-lg font-semibold leading-none tracking-normal">Super League 1</span>
             <span className="block text-xs text-muted-foreground">2025/26 · research, not advice</span>
           </header>
           <EngineStatusBanner />

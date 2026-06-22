@@ -5,24 +5,57 @@
 :root {
   --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
   --font-display: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
-  --background: 210 24% 97%;
-  --foreground: 202 24% 9%;
+  --background: 210 40% 98%;
+  --foreground: 222 47% 11%;
   --card: 0 0% 100%;
-  --card-foreground: 202 24% 9%;
+  --card-foreground: 222 47% 11%;
   --popover: 0 0% 100%;
-  --popover-foreground: 202 24% 9%;
-  --muted: 200 16% 91%;
-  --muted-foreground: 201 9% 39%;
-  --border: 200 16% 84%;
-  --primary: 153 56% 36%;
+  --popover-foreground: 222 47% 11%;
+  --muted: 216 45% 96%;
+  --muted-foreground: 215 16% 47%;
+  --border: 214 32% 91%;
+  --primary: 226 71% 40%;
   --primary-foreground: 0 0% 100%;
-  --accent: 45 91% 63%;
-  --accent-foreground: 202 24% 9%;
-  --destructive: 354 72% 48%;
-  --positive: 153 56% 36%;
-  --caution: 42 90% 44%;
-  --value: 153 56% 36%;
-  --danger: 354 72% 48%;
+  --primary-hover: 224 76% 48%;
+  --ring: 226 71% 40%;
+  --accent: 32 95% 44%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --positive: 142 76% 36%;
+  --caution: 32 95% 44%;
+  --value: 32 95% 44%;
+  --danger: 0 72% 51%;
+  --win: 142 76% 36%;
+  --draw: 215 16% 47%;
+  --loss: 0 72% 51%;
+}
+
+.dark {
+  --background: 220 49% 8%;
+  --foreground: 214 32% 91%;
+  --card: 221 46% 12%;
+  --card-foreground: 214 32% 91%;
+  --popover: 221 46% 12%;
+  --popover-foreground: 214 32% 91%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+  --border: 217 33% 17%;
+  --primary: 217 91% 60%;
+  --primary-foreground: 220 49% 8%;
+  --primary-hover: 217 91% 65%;
+  --ring: 217 91% 60%;
+  --accent: 38 92% 50%;
+  --accent-foreground: 220 49% 8%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 220 49% 8%;
+  --positive: 142 71% 45%;
+  --caution: 38 92% 50%;
+  --value: 38 92% 50%;
+  --danger: 0 84% 60%;
+  --win: 142 71% 45%;
+  --draw: 215 20% 65%;
+  --loss: 0 84% 60%;
 }
 
 * {
@@ -36,7 +69,10 @@ html {
 body {
   margin: 0;
   font-family: var(--font-sans);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
   font-feature-settings: "cv02", "cv03", "cv04", "tnum";
+  font-variant-numeric: tabular-nums;
   letter-spacing: 0;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
