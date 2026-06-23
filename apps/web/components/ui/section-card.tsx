@@ -13,12 +13,12 @@ export function SectionHeader({ label, action, className, ...props }: SectionHea
       <h2 className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
         {label}
       </h2>
-      {action ? <div className="shrink-0 text-xs font-medium text-primary">{action}</div> : null}
+      {action ? <div className="shrink-0 text-xs font-medium text-muted-foreground">{action}</div> : null}
     </div>
   );
 }
 
-type SectionCardProps = HTMLAttributes<HTMLDivElement> & {
+type SectionCardProps = Omit<HTMLAttributes<HTMLDivElement>, "title"> & {
   title?: ReactNode;
   action?: ReactNode;
   headerClassName?: string;
@@ -34,7 +34,7 @@ export function SectionCard({
 }: SectionCardProps) {
   return (
     <section
-      className={cn("rounded-xl border border-border bg-card p-4 text-card-foreground shadow-sm", className)}
+      className={cn("rounded-lg border border-border bg-card p-3 text-card-foreground sm:p-4", className)}
       {...props}
     >
       {title ? <SectionHeader label={title} action={action} className={cn("mb-3", headerClassName)} /> : null}

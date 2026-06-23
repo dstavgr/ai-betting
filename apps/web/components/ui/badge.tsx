@@ -15,10 +15,10 @@ export function Badge({ className, tone, variant = "neutral", ...props }: BadgeP
       className={cn(
         "inline-flex h-6 items-center rounded-md border px-2 text-xs font-medium",
         resolvedTone === "neutral" && "border-border bg-muted text-muted-foreground",
-        resolvedTone === "positive" && "border-win bg-win text-slate-950 dark:text-background",
+        resolvedTone === "positive" && "border-win/50 bg-win/15 text-foreground",
         resolvedTone === "caution" && "border-accent bg-accent text-accent-foreground",
         resolvedTone === "value" && "border-value bg-value text-accent-foreground",
-        resolvedTone === "danger" && "border-loss bg-loss text-white dark:text-background",
+        resolvedTone === "danger" && "border-loss/50 bg-loss/15 text-foreground",
         className,
       )}
       {...props}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Send, Sparkles } from "lucide-react";
+import { Bot, Loader2, Send, Sparkles, User } from "lucide-react";
 import { FormEvent, useMemo, useRef, useState } from "react";
 
 import { SectionCard } from "@/components/ui/section-card";
@@ -73,15 +73,18 @@ export function BetChat({ fixtureId, fixtureLabel }: BetChatProps) {
           {statusLabel}
         </span>
       }
-      className="flex min-h-[24rem] min-w-0 flex-col"
+      className="flex min-h-[22rem] min-w-0 flex-col"
     >
       <div className="mb-3 rounded-lg border border-border bg-muted/35 px-3 py-2">
-        <div className="truncate text-sm font-semibold">{fixtureLabel}</div>
+        <div className="flex min-w-0 items-center gap-2">
+          <Bot className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span className="truncate text-sm font-semibold">{fixtureLabel}</span>
+        </div>
         <div className="mt-0.5 text-[11px] text-muted-foreground">Research and education only. Not betting advice. 21+.</div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3">
-        <div className="max-h-[34rem] min-h-[12rem] flex-1 space-y-2 overflow-y-auto pr-1">
+      <div className="flex min-h-0 flex-1 flex-col gap-2">
+        <div className="max-h-[32rem] min-h-[11rem] flex-1 space-y-2 overflow-y-auto pr-1">
           {messages.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border bg-background p-4 text-sm leading-6 text-muted-foreground">
               Bet AI will answer only from this match, model signal, and displayed provider odds.
@@ -97,6 +100,10 @@ export function BetChat({ fixtureId, fixtureLabel }: BetChatProps) {
                     : "mr-8 border border-border bg-background text-foreground",
                 )}
               >
+                <span className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase opacity-70">
+                  {message.role === "user" ? <User className="size-3" aria-hidden="true" /> : <Bot className="size-3" aria-hidden="true" />}
+                  {message.role === "user" ? "You" : "Bet AI"}
+                </span>
                 {message.content.split("\n").map((line, lineIndex) => (
                   <p key={`${index}-${lineIndex}`} className={lineIndex > 0 ? "mt-2" : undefined}>
                     {line}
@@ -128,7 +135,7 @@ export function BetChat({ fixtureId, fixtureLabel }: BetChatProps) {
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
               placeholder="What is worth watching?"
-              className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/20"
+              className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-muted-foreground"
             />
           </label>
           <button

@@ -12,7 +12,7 @@ export function LiveBadge({
   return (
     <span
       className={cn(
-        "inline-flex h-5 items-center gap-1 rounded-md border border-loss bg-loss px-1.5 text-[10px] font-bold leading-none text-white dark:text-background",
+        "inline-flex h-5 items-center gap-1 rounded-md border border-loss/50 bg-loss/15 px-1.5 text-[10px] font-bold leading-none text-foreground",
         className,
       )}
     >

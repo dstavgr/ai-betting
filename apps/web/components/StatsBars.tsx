@@ -1,3 +1,5 @@
+import { BarChart3 } from "lucide-react";
+
 import type { TeamMatchStats } from "@/lib/types";
 import { SectionCard } from "@/components/ui/section-card";
 import { StatBar } from "@/components/ui/stat-bar";
@@ -17,7 +19,10 @@ export function StatsBars({ stats }: { stats: TeamMatchStats[] }) {
   }
 
   return (
-    <SectionCard className="space-y-4">
+    <SectionCard
+      title={<span className="inline-flex items-center gap-1.5"><BarChart3 className="size-3.5" aria-hidden="true" />Team stats</span>}
+      className="space-y-3"
+    >
       {keys.map((key) => {
         const homeValue = num(home.statistics[key]);
         const awayValue = num(away.statistics[key]);

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CalendarClock } from "lucide-react";
 
 import { LiveBadge } from "@/components/LiveBadge";
 import { TeamCrest } from "@/components/TeamCrest";
@@ -36,7 +37,7 @@ export function FixtureRow({
   return (
     <Link
       href={`/match/${fixture.id}`}
-      className="grid grid-cols-[3.25rem_1fr_auto] items-center gap-3 border-b border-border px-3 py-2.5 transition-colors last:border-b-0 hover:bg-muted/35 lg:[&:nth-last-child(-n+2)]:border-b-0 lg:[&:nth-child(odd)]:border-r"
+      className="grid grid-cols-[3.25rem_1fr_auto] items-center gap-3 border-b border-border px-3 py-2.5 transition-colors last:border-b-0 hover:bg-muted/35 lg:[&:nth-last-child(-n+2)]:border-b-0 lg:[&:nth-child(odd)]:border-r lg:[&:nth-child(odd)]:border-border"
     >
       <div className="flex shrink-0 flex-col items-center gap-1">
         <span className="text-[11px] text-muted-foreground">{kickoff}</span>
@@ -65,7 +66,10 @@ export function FixtureRow({
             <div>{fixture.goals_away ?? "-"}</div>
           </div>
         ) : (
-          <span className="text-xs text-muted-foreground">{shortDate(fixture.kickoff_at).split(",")[0]}</span>
+          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+            <CalendarClock className="size-3" aria-hidden="true" />
+            {shortDate(fixture.kickoff_at).split(",")[0]}
+          </span>
         )}
         {hasTip ? <Badge className="h-5 px-1.5 text-[10px]" variant="positive">Tip</Badge> : null}
       </div>

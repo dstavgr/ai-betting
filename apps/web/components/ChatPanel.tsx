@@ -21,7 +21,7 @@ export function ChatPanel({ fixtureId, fixtureLabel }: ChatPanelProps) {
       <div className="lg:hidden">
         <Sheet>
           <SheetTrigger asChild>
-            <Button className="fixed bottom-20 right-4 z-40 shadow-lg" size="lg">
+            <Button className="fixed bottom-20 right-4 z-40" size="lg">
               <MessageCircle className="size-4" />
               Ask Bet AI
             </Button>

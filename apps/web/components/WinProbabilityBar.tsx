@@ -1,3 +1,5 @@
+import { LineChart } from "lucide-react";
+
 import { SectionCard, SectionHeader } from "@/components/ui/section-card";
 import { pct } from "@/lib/format";
 import type { Recommendation } from "@/lib/types";
@@ -22,7 +24,10 @@ export function WinProbabilityBar({
 
   return (
     <SectionCard className="space-y-2">
-      <SectionHeader label="Fair win probability" action="Model + market blend" />
+      <SectionHeader
+        label={<span className="inline-flex items-center gap-1.5"><LineChart className="size-3.5" aria-hidden="true" />Fair win probability</span>}
+        action="Model + market blend"
+      />
       <div className="flex h-3 overflow-hidden rounded-full bg-muted">
         <div className="bg-primary" style={{ width: `${homeP * 100}%` }} />
         <div className="bg-draw" style={{ width: `${drawP * 100}%` }} />

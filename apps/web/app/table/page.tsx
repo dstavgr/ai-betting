@@ -33,7 +33,12 @@ export default async function TablePage({ searchParams }: TablePageProps) {
         </p>
       ) : (
         <>
-          <StandingsTable rows={rows} fixtures={leagueFixtures} teamApiFootballIds={teamApiFootballIds} />
+          <StandingsTable
+            rows={rows}
+            fixtures={leagueFixtures}
+            teamApiFootballIds={teamApiFootballIds}
+            league={activeLeague}
+          />
           <p className="text-[11px] text-muted-foreground">
             Computed from results; excludes any official point deductions.
           </p>

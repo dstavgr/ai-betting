@@ -14,7 +14,7 @@ export function Button({ asChild, className, variant = "primary", size = "md", .
   return (
     <Comp
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-muted-foreground disabled:pointer-events-none disabled:opacity-50",
         size === "sm" && "h-8 px-2.5",
         size === "md" && "h-9 px-3",
         size === "lg" && "h-10 px-4",

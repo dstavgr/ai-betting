@@ -1,9 +1,10 @@
-import { ChevronDown, Flame, LineChart, ShieldCheck, Sparkles } from "lucide-react";
+import { ChevronDown, Flame, LineChart, ShieldCheck, Target } from "lucide-react";
 import { notFound } from "next/navigation";
 
+import { LeagueCrest } from "@/components/LeagueCrest";
 import { TeamCrest } from "@/components/TeamCrest";
 import { getFixture, getFixtureMarkets, getFixtureRecommendations, getTeams } from "@/lib/api";
-import { defaultLeague } from "@/lib/leagues";
+import { defaultLeague, getLeagueByApiName } from "@/lib/leagues";
 import type { FixtureDetail, FixtureMarkets, Market, MarketOutcome, Recommendation, Team } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -234,18 +235,15 @@ function ProbabilityBar({
   const awayWidth = `${Math.max(probabilities.away * 100, 8)}%`;
 
   return (
-    <section className="rounded-2xl border border-white/5 bg-[#161A20] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.38)] sm:p-5">
+    <section className="rounded-lg border border-white/10 bg-[#161A20] p-3 sm:p-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="font-display text-xs font-bold uppercase tracking-[0.24em] text-[#C8FF2E]">Win probability</p>
-          <h2 className="mt-1 font-display text-3xl font-bold uppercase leading-none text-white sm:text-4xl">
-            Model pulse
-          </h2>
+          <p className="font-display text-xs font-bold uppercase tracking-[0.08em] text-[#8A93A2]">Win probability</p>
         </div>
-        <LineChart className="size-6 text-[#C8FF2E]" aria-hidden="true" />
+        <LineChart className="size-4 text-[#8A93A2]" aria-hidden="true" />
       </div>
 
-      <div className="mt-5 overflow-hidden rounded-full border border-white/10 bg-[#0B0E11] p-1">
+      <div className="mt-3 overflow-hidden rounded-full border border-white/10 bg-[#0B0E11] p-1">
         <div className="flex h-5 overflow-hidden rounded-full bg-white/5">
           <div className="bg-[#C8FF2E]" style={{ width: homeWidth }} />
           <div className="bg-white/35" style={{ width: drawWidth }} />
@@ -253,7 +251,7 @@ function ProbabilityBar({
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
         <ProbabilityMetric label={home} value={probabilities.home} tone="accent" />
         <ProbabilityMetric label="Draw" value={probabilities.draw} tone="light" />
         <ProbabilityMetric label={away} value={probabilities.away} tone="muted" />
@@ -267,9 +265,9 @@ function ProbabilityMetric({ label, value, tone }: { label: string; value: numbe
     tone === "accent" ? "text-[#C8FF2E]" : tone === "light" ? "text-white" : "text-[#8A93A2]";
 
   return (
-    <div className="min-w-0 rounded-xl border border-white/5 bg-white/[0.03] px-2 py-3">
+    <div className="min-w-0 rounded-md border border-white/5 bg-white/[0.03] px-2 py-2">
       <p className="truncate text-[11px] font-semibold uppercase text-[#8A93A2]">{label}</p>
-      <p className={`mt-1 font-display text-2xl font-bold leading-none ${toneClass}`}>{formatPercent(value)}</p>
+      <p className={`mt-1 font-display text-xl font-bold leading-none ${toneClass}`}>{formatPercent(value)}</p>
     </div>
   );
 }
@@ -278,22 +276,19 @@ function MarketBoard({ markets }: { markets: FixtureMarkets | null }) {
   const groups = marketPreview(markets);
 
   return (
-    <section className="rounded-2xl border border-white/5 bg-[#161A20] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.38)] sm:p-5">
+    <section className="rounded-lg border border-white/10 bg-[#161A20] p-3 sm:p-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="font-display text-xs font-bold uppercase tracking-[0.24em] text-[#C8FF2E]">Bet options</p>
-          <h2 className="mt-1 font-display text-4xl font-bold uppercase leading-none text-white sm:text-5xl">
-            Odds board
-          </h2>
+          <p className="font-display text-xs font-bold uppercase tracking-[0.08em] text-[#8A93A2]">Bet options</p>
         </div>
-        <div className="rounded-full border border-white/10 bg-[#0B0E11] px-3 py-1 text-xs font-bold uppercase text-[#8A93A2]">
+        <div className="rounded-md border border-white/10 bg-[#0B0E11] px-2 py-1 text-xs font-bold uppercase text-[#8A93A2]">
           {markets?.market_count ?? 0} markets
         </div>
       </div>
 
-      <div className="mt-5 space-y-3">
+      <div className="mt-3 space-y-2">
         {groups.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-white/10 bg-[#0B0E11] p-5 text-sm text-[#8A93A2]">
+          <div className="rounded-lg border border-dashed border-white/10 bg-[#0B0E11] p-4 text-sm text-[#8A93A2]">
             No markets available for this fixture.
           </div>
         ) : (
@@ -301,34 +296,34 @@ function MarketBoard({ markets }: { markets: FixtureMarkets | null }) {
             <details
               key={`${group.group}-${groupIndex}`}
               open={groupIndex < 2}
-              className="group overflow-hidden rounded-2xl border border-white/5 bg-[#0B0E11]"
+              className="group overflow-hidden rounded-lg border border-white/10 bg-[#0B0E11]"
             >
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 transition hover:bg-white/[0.03] [&::-webkit-details-marker]:hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 transition hover:bg-white/[0.03] [&::-webkit-details-marker]:hidden">
                 <div className="min-w-0">
-                  <h3 className="truncate font-display text-2xl font-bold uppercase leading-none text-white">
+                  <h3 className="truncate text-sm font-semibold text-white">
                     {group.group}
                   </h3>
                   <p className="mt-1 text-xs font-semibold uppercase text-[#8A93A2]">
                     {group.markets.length} {group.markets.length === 1 ? "market" : "markets"}
                   </p>
                 </div>
-                <ChevronDown className="size-5 shrink-0 text-[#C8FF2E] transition group-open:rotate-180" />
+                <ChevronDown className="size-4 shrink-0 text-[#8A93A2] transition group-open:rotate-180" />
               </summary>
 
-              <div className="space-y-4 border-t border-white/5 p-3 sm:p-4">
+              <div className="space-y-3 border-t border-white/5 p-3">
                 {topMarkets(group.markets).map((market, marketIndex) => (
                   <section key={`${market.market_name}-${marketIndex}`}>
-                    <h4 className="truncate text-sm font-bold uppercase text-[#DDE3EA]">{market.market_name}</h4>
+                    <h4 className="truncate text-xs font-bold uppercase tracking-[0.08em] text-[#8A93A2]">{market.market_name}</h4>
                     <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                       {topOutcomes(market.outcomes).map((outcome, outcomeIndex) => (
                         <div
                           key={`${outcomeLabel(outcome)}-${outcomeIndex}`}
-                          className="min-h-24 rounded-xl border border-white/5 bg-[#161A20] p-3 transition duration-200 hover:-translate-y-0.5 hover:border-[#C8FF2E]/70 hover:bg-[#C8FF2E] hover:text-[#0B0E11] hover:shadow-[0_16px_40px_rgba(200,255,46,0.16)]"
+                          className="min-h-20 rounded-md border border-white/10 bg-[#161A20] p-2.5 transition-colors hover:border-[#C8FF2E] hover:bg-[#C8FF2E] hover:text-[#0B0E11]"
                         >
                           <p className="line-clamp-2 text-xs font-semibold uppercase text-inherit opacity-70">
                             {outcomeLabel(outcome)}
                           </p>
-                          <p className="mt-3 font-display text-3xl font-bold leading-none tracking-normal">
+                          <p className="mt-2 font-display text-2xl font-bold leading-none tracking-normal">
                             {formatOdds(outcome.best_odds)}
                           </p>
                           <p className="mt-2 truncate text-[10px] font-bold uppercase opacity-50">
@@ -362,18 +357,15 @@ function FormStatsStrip({
   const stats = ["Ball Possession", "Total Shots", "Shots on Goal", "Corner Kicks"];
 
   return (
-    <section className="rounded-2xl border border-white/5 bg-[#161A20] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.38)] sm:p-5">
+    <section className="rounded-lg border border-white/10 bg-[#161A20] p-3 sm:p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="font-display text-xs font-bold uppercase tracking-[0.24em] text-[#C8FF2E]">Form / stats</p>
-          <h2 className="mt-1 font-display text-3xl font-bold uppercase leading-none text-white sm:text-4xl">
-            Match strip
-          </h2>
+          <p className="font-display text-xs font-bold uppercase tracking-[0.08em] text-[#8A93A2]">Form / stats</p>
         </div>
-        <ShieldCheck className="size-6 text-[#C8FF2E]" aria-hidden="true" />
+        <ShieldCheck className="size-4 text-[#8A93A2]" aria-hidden="true" />
       </div>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-[0.9fr_1.1fr]">
+      <div className="mt-3 grid gap-3 md:grid-cols-[0.9fr_1.1fr]">
         <div className="grid grid-cols-2 gap-2">
           <StripMetric label="Best edge" value={recommendation ? formatSignedPercent(recommendation.edge) : "-"} />
           <StripMetric label="Confidence" value={recommendation ? formatPercent(recommendation.confidence) : "-"} />
@@ -381,7 +373,7 @@ function FormStatsStrip({
           <StripMetric label="Book" value={recommendation?.bookmaker_slug ?? "-"} compact />
         </div>
 
-        <div className="rounded-xl border border-white/5 bg-[#0B0E11] p-3">
+        <div className="rounded-lg border border-white/10 bg-[#0B0E11] p-3">
           <div className="grid grid-cols-[1fr_auto_1fr] gap-2 text-[11px] font-bold uppercase text-[#8A93A2]">
             <span className="truncate">{home}</span>
             <span>Stat</span>
@@ -409,11 +401,11 @@ function FormStatsStrip({
 
 function StripMetric({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {
   return (
-    <div className="min-w-0 rounded-xl border border-white/5 bg-[#0B0E11] p-3">
+    <div className="min-w-0 rounded-md border border-white/10 bg-[#0B0E11] p-3">
       <p className="text-[10px] font-bold uppercase text-[#8A93A2]">{label}</p>
       <p
         className={`mt-2 truncate font-display font-bold uppercase leading-none text-[#C8FF2E] ${
-          compact ? "text-2xl" : "text-3xl"
+          compact ? "text-xl" : "text-2xl"
         }`}
       >
         {value}
@@ -439,44 +431,46 @@ export default async function PreviewPage() {
   const ids = teamApiFootballIds(teams);
   const probabilities = getWinProbabilities(recommendations, markets, home, away);
   const recommendation = bestRecommendation(recommendations);
+  const league = getLeagueByApiName(fixture.league) ?? defaultLeague;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-[#0B0E11] text-white">
-      <main className="mx-auto min-h-dvh w-full max-w-7xl px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
-        <section className="overflow-hidden rounded-2xl border border-white/5 bg-[#161A20] shadow-[0_24px_80px_rgba(0,0,0,0.42)]">
+      <main className="mx-auto min-h-dvh w-full max-w-5xl px-4 py-4">
+        <section className="overflow-hidden rounded-lg border border-white/10 bg-[#161A20]">
           <div className="h-1.5 bg-[#C8FF2E]" />
-          <div className="p-4 sm:p-6 lg:p-7">
+          <div className="p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
-                <span className="rounded-full bg-[#C8FF2E] px-3 py-1 text-[11px] font-black uppercase text-[#0B0E11]">
+                <span className="rounded-md bg-[#C8FF2E] px-2 py-1 text-[11px] font-black uppercase text-[#0B0E11]">
                   Preview
                 </span>
+                <LeagueCrest name={league.name} apiFootballId={league.api_football_id} size={20} />
                 <span className="truncate text-xs font-bold uppercase text-[#8A93A2]">
                   {fixture.league ?? defaultLeague.name}
                   {fixture.round ? ` / ${fixture.round}` : ""}
                 </span>
               </div>
-              <span className="rounded-full border border-white/10 px-3 py-1 text-xs font-bold uppercase text-[#8A93A2]">
+              <span className="rounded-md border border-white/10 px-2 py-1 text-xs font-bold uppercase text-[#8A93A2]">
                 {formatDate(fixture.kickoff_at)}
               </span>
             </div>
 
-            <div className="mt-6 grid items-center gap-5 lg:grid-cols-[1fr_auto_1fr]">
-              <div className="flex min-w-0 items-center gap-4 lg:justify-end">
+            <div className="mt-4 grid items-center gap-4 lg:grid-cols-[1fr_auto_1fr]">
+              <div className="flex min-w-0 items-center gap-3 lg:justify-end">
                 <div className="min-w-0 text-left lg:text-right">
-                  <p className="font-display text-4xl font-bold uppercase leading-none text-white sm:text-5xl lg:text-6xl">
+                  <p className="font-display text-3xl font-bold uppercase leading-none text-white sm:text-4xl lg:text-5xl">
                     {home}
                   </p>
                   <p className="mt-2 text-xs font-bold uppercase text-[#8A93A2]">Home side</p>
                 </div>
-                <div className="rounded-full border border-white/10 bg-[#0B0E11] p-2 shadow-[0_0_30px_rgba(200,255,46,0.10)]">
+                <div className="rounded-full border border-white/10 bg-[#0B0E11] p-2">
                   <TeamCrest name={home} apiFootballId={ids.get(home)} size={58} />
                 </div>
               </div>
 
-              <div className="mx-auto flex min-w-40 flex-col items-center rounded-2xl border border-[#C8FF2E]/25 bg-[#0B0E11] px-6 py-4 shadow-[0_0_50px_rgba(200,255,46,0.10)]">
-                <Sparkles className="mb-2 size-5 text-[#C8FF2E]" aria-hidden="true" />
-                <p className="font-display text-6xl font-bold uppercase leading-none text-[#C8FF2E] sm:text-7xl">
+              <div className="mx-auto flex min-w-36 flex-col items-center rounded-lg border border-white/10 bg-[#0B0E11] px-4 py-3">
+                <Target className="mb-2 size-4 text-[#8A93A2]" aria-hidden="true" />
+                <p className="font-display text-5xl font-bold uppercase leading-none text-[#C8FF2E] sm:text-6xl">
                   {score(fixture.goals_home, fixture.goals_away)}
                 </p>
                 <p className="mt-2 text-xs font-bold uppercase text-[#8A93A2]">
@@ -484,12 +478,12 @@ export default async function PreviewPage() {
                 </p>
               </div>
 
-              <div className="flex min-w-0 items-center gap-4 lg:justify-start">
-                <div className="rounded-full border border-white/10 bg-[#0B0E11] p-2 shadow-[0_0_30px_rgba(200,255,46,0.10)]">
+              <div className="flex min-w-0 items-center gap-3 lg:justify-start">
+                <div className="rounded-full border border-white/10 bg-[#0B0E11] p-2">
                   <TeamCrest name={away} apiFootballId={ids.get(away)} size={58} />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-display text-4xl font-bold uppercase leading-none text-white sm:text-5xl lg:text-6xl">
+                  <p className="font-display text-3xl font-bold uppercase leading-none text-white sm:text-4xl lg:text-5xl">
                     {away}
                   </p>
                   <p className="mt-2 text-xs font-bold uppercase text-[#8A93A2]">Away side</p>
@@ -497,12 +491,12 @@ export default async function PreviewPage() {
               </div>
             </div>
 
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[#0B0E11] px-3 py-2 text-xs font-bold uppercase text-[#DDE3EA]">
-                <Flame className="size-4 text-[#C8FF2E]" aria-hidden="true" />
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-[#0B0E11] px-3 py-2 text-xs font-bold uppercase text-[#DDE3EA]">
+                <Flame className="size-4 text-[#8A93A2]" aria-hidden="true" />
                 {recommendation ? `${recommendation.selection} @ ${recommendation.decimal_odds.toFixed(2)}` : "No pick"}
               </span>
-              <span className="rounded-full border border-white/10 bg-[#0B0E11] px-3 py-2 text-xs font-bold uppercase text-[#8A93A2]">
+              <span className="rounded-md border border-white/10 bg-[#0B0E11] px-3 py-2 text-xs font-bold uppercase text-[#8A93A2]">
                 Model {recommendation?.model_version ?? "pending"}
               </span>
             </div>

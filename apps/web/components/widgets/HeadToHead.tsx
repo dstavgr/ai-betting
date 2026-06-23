@@ -1,3 +1,6 @@
+import { Swords } from "lucide-react";
+
+import { TeamCrest } from "@/components/TeamCrest";
 import { SectionCard } from "@/components/ui/section-card";
 import { shortDate, score } from "@/lib/format";
 import { headToHead } from "@/lib/h2h";
@@ -7,17 +10,22 @@ type HeadToHeadProps = {
   fixtures: Fixture[];
   homeName: string;
   awayName: string;
+  homeApiFootballId?: number;
+  awayApiFootballId?: number;
 };
 
 function segmentWidth(count: number, total: number): string {
   return total > 0 ? `${(count / total) * 100}%` : "0%";
 }
 
-export function HeadToHead({ fixtures, homeName, awayName }: HeadToHeadProps) {
+export function HeadToHead({ fixtures, homeName, awayName, homeApiFootballId, awayApiFootballId }: HeadToHeadProps) {
   const h2h = headToHead(fixtures, homeName, awayName);
 
   return (
-    <SectionCard title="Head to head" className="space-y-3">
+    <SectionCard
+      title={<span className="inline-flex items-center gap-1.5"><Swords className="size-3.5" aria-hidden="true" />Head to head</span>}
+      className="space-y-3"
+    >
       {h2h.total === 0 ? (
         <p className="text-sm text-muted-foreground">No head-to-head data</p>
       ) : (
@@ -48,12 +56,22 @@ export function HeadToHead({ fixtures, homeName, awayName }: HeadToHeadProps) {
                 className="flex items-center gap-3 py-2 text-sm"
               >
                 <span className="shrink-0 text-[11px] text-muted-foreground">{shortDate(meeting.kickoff)}</span>
-                <span className="min-w-0 flex-1 truncate">
-                  {meeting.home}{" "}
+                <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                  <TeamCrest
+                    name={meeting.home}
+                    apiFootballId={meeting.home === homeName ? homeApiFootballId : awayApiFootballId}
+                    size={18}
+                  />
+                  <span className="min-w-0 truncate">{meeting.home}</span>
                   <span className="font-display font-semibold text-foreground">
                     {score(meeting.goalsHome, meeting.goalsAway)}
-                  </span>{" "}
-                  {meeting.away}
+                  </span>
+                  <TeamCrest
+                    name={meeting.away}
+                    apiFootballId={meeting.away === homeName ? homeApiFootballId : awayApiFootballId}
+                    size={18}
+                  />
+                  <span className="min-w-0 truncate">{meeting.away}</span>
                 </span>
               </li>
             ))}

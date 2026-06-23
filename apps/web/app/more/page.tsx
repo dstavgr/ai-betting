@@ -9,7 +9,7 @@ export default function MorePage() {
   return (
     <div className="space-y-3">
       <h1 className="text-lg font-semibold">More</h1>
-      <ul className="divide-y divide-border rounded-xl border border-border bg-card shadow-sm">
+      <ul className="divide-y divide-border rounded-lg border border-border bg-card">
         {links.map((l) => (
           <li key={l.href}>
             <Link href={l.href} className="block px-4 py-3 text-sm">

@@ -13,16 +13,16 @@ const settings = [
 
 export default function SettingsPage() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <section>
-        <p className="text-sm font-medium text-primary">Configuration</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-normal">Settings</h1>
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Configuration</p>
+        <h1 className="mt-1 text-lg font-semibold">Settings</h1>
       </section>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Guardrails</CardTitle>
-          <ShieldCheck className="h-4 w-4 text-primary" aria-hidden="true" />
+          <ShieldCheck className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
         </CardHeader>
         <CardContent>
           <dl className="divide-y divide-border">

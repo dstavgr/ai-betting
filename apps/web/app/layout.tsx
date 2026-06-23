@@ -4,6 +4,7 @@ import { Suspense } from "react";
 
 import { BottomNav, SidebarNav } from "@/components/BottomNav";
 import { EngineStatusBanner } from "@/components/EngineStatusBanner";
+import { LeagueCrest } from "@/components/LeagueCrest";
 import { LeagueSwitcher } from "@/components/LeagueSwitcher";
 import { defaultLeague } from "@/lib/leagues";
 
@@ -33,13 +34,16 @@ export const metadata: Metadata = {
 
 function LeagueSwitcherFallback() {
   return (
-    <div className="min-w-0">
-      <span className="block truncate font-display text-lg font-semibold leading-none tracking-normal">
-        {defaultLeague.name}
-      </span>
-      <span className="block truncate text-xs text-muted-foreground">
-        {defaultLeague.season} &middot; research, not advice
-      </span>
+    <div className="flex min-w-0 items-center gap-2">
+      <LeagueCrest name={defaultLeague.name} apiFootballId={defaultLeague.api_football_id} size={26} />
+      <div className="min-w-0">
+        <span className="block truncate font-display text-lg font-semibold leading-none tracking-normal">
+          {defaultLeague.name}
+        </span>
+        <span className="block truncate text-xs text-muted-foreground">
+          {defaultLeague.season} &middot; research, not advice
+        </span>
+      </div>
     </div>
   );
 }
@@ -52,15 +56,15 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body className={`${barlow.variable} ${barlowCondensed.variable} font-sans antialiased`}>
-        <div className="mx-auto flex min-h-screen max-w-2xl flex-col bg-background text-foreground md:max-w-6xl">
-          <header className="sticky top-0 z-40 border-b border-border bg-card/95 px-4 py-3 shadow-sm backdrop-blur md:px-6">
+        <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col bg-background text-foreground md:max-w-5xl">
+          <header className="sticky top-0 z-40 border-b border-border bg-card/95 px-4 py-3 backdrop-blur md:px-5">
             <span className="mb-1 block font-display text-base font-extrabold uppercase tracking-tight">Bet<span className="text-primary">AI</span></span>
             <Suspense fallback={<LeagueSwitcherFallback />}>
               <LeagueSwitcher />
             </Suspense>
           </header>
           <EngineStatusBanner />
-          <div className="flex flex-1 md:gap-4 md:px-6 md:py-5 lg:gap-6">
+          <div className="flex flex-1 md:gap-3 md:px-5 md:py-4 lg:gap-4">
             <Suspense fallback={null}>
               <SidebarNav />
             </Suspense>

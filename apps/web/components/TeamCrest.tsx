@@ -1,3 +1,10 @@
+"use client";
+
+/* eslint-disable @next/next/no-img-element */
+
+import { Shield } from "lucide-react";
+import { useState } from "react";
+
 import { crestUrl } from "@/lib/crest";
 
 export function TeamCrest({
@@ -10,19 +17,29 @@ export function TeamCrest({
   size?: number;
 }) {
   const url = crestUrl(apiFootballId);
+  const [failed, setFailed] = useState(false);
 
-  if (!url) {
+  if (!url || failed) {
     return (
       <span
-        className="flex shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground"
+        className="flex shrink-0 items-center justify-center rounded-full border border-border bg-muted text-[10px] font-semibold text-muted-foreground"
         style={{ width: size, height: size }}
-        aria-hidden="true"
+        aria-label={name}
       >
-        {name.slice(0, 2).toUpperCase()}
+        {name.trim() ? name.slice(0, 2).toUpperCase() : <Shield className="size-3" aria-hidden="true" />}
       </span>
     );
   }
 
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={url} alt="" width={size} height={size} className="shrink-0 rounded-full" loading="lazy" />;
+  return (
+    <img
+      src={url}
+      alt=""
+      width={size}
+      height={size}
+      className="shrink-0 rounded-full"
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  );
 }

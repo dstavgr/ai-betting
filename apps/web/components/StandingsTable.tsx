@@ -1,6 +1,10 @@
+import { ListOrdered } from "lucide-react";
+
 import { FormGuide } from "@/components/widgets/FormGuide";
+import { LeagueCrest } from "@/components/LeagueCrest";
 import { TeamCrest } from "@/components/TeamCrest";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import type { LeagueConfig } from "@/lib/leagues";
 import type { Fixture, Standing } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -20,14 +24,25 @@ export function StandingsTable({
   rows,
   fixtures,
   teamApiFootballIds,
+  league,
 }: {
   rows: Standing[];
   fixtures: Fixture[];
   teamApiFootballIds?: Map<string, number>;
+  league?: LeagueConfig;
 }) {
   return (
     <div className="space-y-2">
-      <div className="overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-sm">
+      <div className="overflow-hidden rounded-lg border border-border bg-card text-card-foreground">
+        {league ? (
+          <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/45 px-3 py-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <LeagueCrest name={league.name} apiFootballId={league.api_football_id} size={22} />
+              <span className="truncate font-display text-sm font-semibold leading-none">{league.name}</span>
+            </div>
+            <ListOrdered className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          </div>
+        ) : null}
         <Table className="min-w-[360px] md:min-w-[640px]">
           <TableHeader className="bg-muted/45">
             <TableRow className="border-l-4 border-l-transparent hover:bg-transparent">

@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, SlidersHorizontal } from "lucide-react";
+import { CircleDollarSign, Search, SlidersHorizontal } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { SectionCard } from "@/components/ui/section-card";
@@ -203,7 +203,7 @@ export function OddsBoard({ odds }: { odds: FixtureOdds | null }) {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search market or book"
-              className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/20"
+              className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-muted-foreground"
             />
           </label>
 
@@ -216,9 +216,12 @@ export function OddsBoard({ odds }: { odds: FixtureOdds | null }) {
               groups.map((group) => (
                 <section key={group.key} className="overflow-hidden rounded-lg border border-border bg-background">
                   <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/35 px-3 py-2">
-                    <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <CircleDollarSign className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      <div className="min-w-0">
                       <div className="truncate text-sm font-semibold">{group.market}</div>
                       <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{providerLabel(group.provider)}</div>
+                      </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground">
                       <SlidersHorizontal className="size-3" />

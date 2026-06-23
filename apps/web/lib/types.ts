@@ -142,6 +142,8 @@ export type FixtureEvent = {
   elapsed: number | null;
   extra: number | null;
   team: string | null;
+  player_id?: number | null;
+  assist_id?: number | null;
   player_name: string | null;
   assist_name: string | null;
   type: string | null;

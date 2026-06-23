@@ -44,7 +44,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 border-t border-border bg-card/95 shadow-sm backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 border-t border-border bg-card/95 backdrop-blur md:hidden"
       aria-label="Primary"
     >
       {tabs.map((tab) => {
@@ -56,7 +56,7 @@ export function BottomNav() {
             key={tab.href}
             href={navHref(tab.href)}
             className={`flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors ${
-              active ? "text-primary" : "text-muted-foreground"
+              active ? "text-foreground" : "text-muted-foreground"
             }`}
           >
             <Icon className="h-5 w-5" aria-hidden="true" />
@@ -74,7 +74,7 @@ export function SidebarNav() {
 
   return (
     <aside className="hidden w-44 shrink-0 md:block lg:w-52" aria-label="Primary">
-      <nav className="sticky top-[76px] space-y-1 rounded-xl border border-border bg-card p-2 text-card-foreground shadow-sm">
+      <nav className="sticky top-[76px] space-y-1 rounded-lg border border-border bg-card p-2 text-card-foreground">
         <LeagueSwitcher compact className="mb-2 border-b border-border px-2 pb-3 pt-1" />
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -87,7 +87,7 @@ export function SidebarNav() {
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 active
-                  ? "bg-primary text-primary-foreground shadow-sm"
+                  ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
               )}
             >

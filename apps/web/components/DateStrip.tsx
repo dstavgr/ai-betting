@@ -38,9 +38,9 @@ export function DateStrip({
         <button
           key={date}
           onClick={() => onSelect(date)}
-          className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+          className={`shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
             date === active
-              ? "border-primary bg-primary text-primary-foreground shadow-sm"
+              ? "border-primary bg-primary text-primary-foreground"
               : "border-border bg-card text-muted-foreground hover:bg-muted/70"
           }`}
           type="button"

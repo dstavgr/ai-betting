@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 
+import { LeagueCrest } from "@/components/LeagueCrest";
 import { getLeagueByKey, leagues } from "@/lib/leagues";
 import { cn } from "@/lib/utils";
 
@@ -26,18 +27,21 @@ export function LeagueSwitcher({ compact = false, className }: LeagueSwitcherPro
 
   if (leagues.length === 1) {
     return (
-      <div className={cn("min-w-0", className)}>
-        <span
-          className={cn(
-            "block truncate font-display font-semibold leading-none tracking-normal",
-            compact ? "text-sm" : "text-lg",
-          )}
-        >
-          {activeLeague.name}
-        </span>
-        <span className="block truncate text-xs text-muted-foreground">
-          {activeLeague.season} &middot; research, not advice
-        </span>
+      <div className={cn("flex min-w-0 items-center gap-2", className)}>
+        <LeagueCrest name={activeLeague.name} apiFootballId={activeLeague.api_football_id} size={compact ? 20 : 26} />
+        <div className="min-w-0">
+          <span
+            className={cn(
+              "block truncate font-display font-semibold leading-none tracking-normal",
+              compact ? "text-sm" : "text-lg",
+            )}
+          >
+            {activeLeague.name}
+          </span>
+          <span className="block truncate text-xs text-muted-foreground">
+            {activeLeague.season} &middot; research, not advice
+          </span>
+        </div>
       </div>
     );
   }
@@ -45,12 +49,13 @@ export function LeagueSwitcher({ compact = false, className }: LeagueSwitcherPro
   return (
     <label className={cn("grid min-w-0 gap-1", className)}>
       <span className="sr-only">League</span>
-      <span className={cn("relative block min-w-0", compact ? "max-w-full" : "max-w-64")}>
+      <span className={cn("relative flex min-w-0 items-center gap-2", compact ? "max-w-full" : "max-w-64")}>
+        <LeagueCrest name={activeLeague.name} apiFootballId={activeLeague.api_football_id} size={compact ? 20 : 26} />
         <select
           value={activeLeague.key}
           onChange={(event) => onChange(event.target.value)}
           className={cn(
-            "h-8 w-full appearance-none truncate rounded-md border border-border bg-background py-1 pl-2 pr-8 font-display font-semibold leading-none text-foreground shadow-sm outline-none transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/20",
+            "h-8 w-full appearance-none truncate rounded-md border border-border bg-background py-1 pl-2 pr-8 font-display font-semibold leading-none text-foreground outline-none transition-colors focus-visible:border-muted-foreground",
             compact ? "text-sm" : "text-lg",
           )}
         >
