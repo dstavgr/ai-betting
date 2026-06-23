@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 from typing import Any
 
+import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -28,6 +29,7 @@ from app.db.models import (
 )
 from app.db.session import SessionLocal
 from app.features import FEATURE_VERSION
+from app.llm.deepseek import DeepSeekClient, DeepSeekError
 from app.live import HALFTIME_STATUSES, LIVE_STATUSES, LiveState, live_state_from_fixture
 from app.modeling import (
     backtest_baseline,
@@ -49,7 +51,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=False,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -221,6 +223,7 @@ class OddsSummary(BaseModel):
 
 class OddsPriceRead(BaseModel):
     id: int
+    provider: str
     bookmaker_slug: str
     market_id: str
     market_name: str | None
@@ -235,6 +238,21 @@ class OddsPriceRead(BaseModel):
     active: bool | None
     is_main_line: bool | None
     changed_at: datetime | None
+    metadata: dict[str, Any]
+
+
+class FixtureOddsProviderRead(BaseModel):
+    provider: str
+    snapshot_id: int
+    provider_fixture_id: str | None
+    provider_tournament_id: str | None
+    captured_at: datetime | None
+    source_endpoint: str | None
+    bookmaker_count: int
+    market_count: int
+    outcome_count: int
+    latest_price_changed_at: datetime | None
+    prices: list[OddsPriceRead]
 
 
 class FixtureOddsRead(BaseModel):
@@ -250,7 +268,20 @@ class FixtureOddsRead(BaseModel):
     outcome_count: int
     latest_price_changed_at: datetime | None
     complete_1x2: bool
+    providers: list[FixtureOddsProviderRead]
     prices: list[OddsPriceRead]
+
+
+class FixtureBetChatRequest(BaseModel):
+    question: str
+
+
+class FixtureBetChatResponse(BaseModel):
+    fixture_id: int
+    answer: str
+    ai_generated: bool
+    ai_provider: str | None
+    warnings: list[str]
 
 
 class BacktestSummary(BaseModel):
@@ -566,45 +597,64 @@ def data_odds_summary() -> OddsSummary:
 
 
 @app.get("/data/fixtures/{fixture_id}/odds", response_model=FixtureOddsRead)
-def data_fixture_odds(fixture_id: int, limit: int = 24) -> FixtureOddsRead:
+def data_fixture_odds(fixture_id: int, limit: int = 5000) -> FixtureOddsRead:
     with SessionLocal() as session:
-        snapshot_row = session.execute(
-            select(
-                odds_snapshot.c.id.label("snapshot_id"),
-                odds_snapshot.c.provider,
-                odds_snapshot.c.provider_fixture_id,
-                odds_snapshot.c.provider_tournament_id,
-                odds_snapshot.c.captured_at,
-                odds_snapshot.c.source_endpoint,
-                odds_snapshot.c.bookmaker_count,
-                odds_snapshot.c.market_count,
-                odds_snapshot.c.outcome_count,
-            )
-            .where(odds_snapshot.c.fixture_id == fixture_id)
-            .order_by(desc(odds_snapshot.c.captured_at), desc(odds_snapshot.c.id))
-            .limit(1)
-        ).mappings().one_or_none()
+        return fixture_odds_read(session, fixture_id, limit=limit)
 
-        if snapshot_row is None:
-            return FixtureOddsRead(
-                fixture_id=fixture_id,
-                snapshot_id=None,
-                provider=None,
-                provider_fixture_id=None,
-                provider_tournament_id=None,
-                captured_at=None,
-                source_endpoint=None,
-                bookmaker_count=0,
-                market_count=0,
-                outcome_count=0,
-                latest_price_changed_at=None,
-                complete_1x2=False,
-                prices=[],
-            )
 
+def fixture_odds_read(session, fixture_id: int, *, limit: int = 5000) -> FixtureOddsRead:
+    per_provider_limit = max(1, min(limit, 5000))
+    snapshot_rows = session.execute(
+        select(
+            odds_snapshot.c.id.label("snapshot_id"),
+            odds_snapshot.c.provider,
+            odds_snapshot.c.provider_fixture_id,
+            odds_snapshot.c.provider_tournament_id,
+            odds_snapshot.c.captured_at,
+            odds_snapshot.c.source_endpoint,
+            odds_snapshot.c.bookmaker_count,
+            odds_snapshot.c.market_count,
+            odds_snapshot.c.outcome_count,
+        )
+        .where(odds_snapshot.c.fixture_id == fixture_id)
+        .order_by(desc(odds_snapshot.c.captured_at), desc(odds_snapshot.c.id))
+        .limit(200)
+    ).mappings()
+
+    latest_by_provider: list[dict[str, Any]] = []
+    seen_providers: set[str] = set()
+    for row in snapshot_rows:
+        provider = row["provider"] or "unknown"
+        if provider in seen_providers:
+            continue
+        seen_providers.add(provider)
+        latest_by_provider.append(dict(row))
+
+    if not latest_by_provider:
+        return FixtureOddsRead(
+            fixture_id=fixture_id,
+            snapshot_id=None,
+            provider=None,
+            provider_fixture_id=None,
+            provider_tournament_id=None,
+            captured_at=None,
+            source_endpoint=None,
+            bookmaker_count=0,
+            market_count=0,
+            outcome_count=0,
+            latest_price_changed_at=None,
+            complete_1x2=False,
+            providers=[],
+            prices=[],
+        )
+
+    providers: list[FixtureOddsProviderRead] = []
+    flat_prices: list[OddsPriceRead] = []
+    for snapshot_row in latest_by_provider:
         price_rows = session.execute(
             select(
                 odds_price.c.id,
+                odds_price.c.provider,
                 odds_price.c.bookmaker_slug,
                 odds_price.c.market_id,
                 odds_price.c.market_name,
@@ -619,43 +669,264 @@ def data_fixture_odds(fixture_id: int, limit: int = 24) -> FixtureOddsRead:
                 odds_price.c.active,
                 odds_price.c.is_main_line,
                 odds_price.c.changed_at,
+                odds_price.c["metadata"],
             )
             .where(odds_price.c.snapshot_id == snapshot_row["snapshot_id"])
-            .order_by(odds_price.c.bookmaker_slug, odds_price.c.market_id, odds_price.c.outcome_id, odds_price.c.player_key)
-            .limit(min(limit, 200))
+            .order_by(
+                odds_price.c.bookmaker_slug,
+                odds_price.c.market_name,
+                odds_price.c.market_id,
+                odds_price.c.line.nullslast(),
+                odds_price.c.outcome_name,
+                odds_price.c.outcome_id,
+                odds_price.c.player_key,
+            )
+            .limit(per_provider_limit)
         ).mappings()
         prices = [OddsPriceRead(**dict(row)) for row in price_rows]
-        outcomes = {
-            price.outcome_id
-            for price in prices
-            if price.market_id == "101" and price.price_decimal is not None and price.price_decimal > 1
-        }
-        latest_changed_at = max(
+        provider_latest_changed_at = max(
             (price.changed_at for price in prices if price.changed_at is not None),
             default=None,
         )
-
-        return FixtureOddsRead(
-            fixture_id=fixture_id,
-            snapshot_id=snapshot_row["snapshot_id"],
-            provider=snapshot_row["provider"],
-            provider_fixture_id=snapshot_row["provider_fixture_id"],
-            provider_tournament_id=snapshot_row["provider_tournament_id"],
-            captured_at=snapshot_row["captured_at"],
-            source_endpoint=snapshot_row["source_endpoint"],
-            bookmaker_count=snapshot_row["bookmaker_count"],
-            market_count=snapshot_row["market_count"],
-            outcome_count=snapshot_row["outcome_count"],
-            latest_price_changed_at=latest_changed_at,
-            complete_1x2={"101", "102", "103"}.issubset(outcomes),
-            prices=prices,
+        providers.append(
+            FixtureOddsProviderRead(
+                provider=snapshot_row["provider"] or "unknown",
+                snapshot_id=snapshot_row["snapshot_id"],
+                provider_fixture_id=snapshot_row["provider_fixture_id"],
+                provider_tournament_id=snapshot_row["provider_tournament_id"],
+                captured_at=snapshot_row["captured_at"],
+                source_endpoint=snapshot_row["source_endpoint"],
+                bookmaker_count=snapshot_row["bookmaker_count"],
+                market_count=snapshot_row["market_count"],
+                outcome_count=snapshot_row["outcome_count"],
+                latest_price_changed_at=provider_latest_changed_at,
+                prices=prices,
+            )
         )
+        flat_prices.extend(prices)
+
+    newest_snapshot = latest_by_provider[0]
+    outcomes = {
+        price.outcome_id
+        for price in flat_prices
+        if price.market_id == "101" and price.price_decimal is not None and price.price_decimal > 1
+    }
+    latest_changed_at = max(
+        (price.changed_at for price in flat_prices if price.changed_at is not None),
+        default=None,
+    )
+
+    return FixtureOddsRead(
+        fixture_id=fixture_id,
+        snapshot_id=newest_snapshot["snapshot_id"],
+        provider=newest_snapshot["provider"],
+        provider_fixture_id=newest_snapshot["provider_fixture_id"],
+        provider_tournament_id=newest_snapshot["provider_tournament_id"],
+        captured_at=newest_snapshot["captured_at"],
+        source_endpoint=newest_snapshot["source_endpoint"],
+        bookmaker_count=len({price.bookmaker_slug for price in flat_prices}),
+        market_count=len({(price.provider, price.market_id, price.market_name) for price in flat_prices}),
+        outcome_count=len(flat_prices),
+        latest_price_changed_at=latest_changed_at,
+        complete_1x2={"101", "102", "103"}.issubset(outcomes),
+        providers=providers,
+        prices=flat_prices,
+    )
 
 
 @app.get("/data/fixtures/{fixture_id}/recommendations", response_model=list[Recommendation])
 def data_fixture_recommendations(fixture_id: int) -> list[Recommendation]:
     with SessionLocal() as session:
         return [Recommendation(**row) for row in baseline_recommendations_for_fixture(session, fixture_id)]
+
+
+@app.post("/data/fixtures/{fixture_id}/bet-chat", response_model=FixtureBetChatResponse)
+def data_fixture_bet_chat(fixture_id: int, request: FixtureBetChatRequest) -> FixtureBetChatResponse:
+    question = " ".join(request.question.split())
+    if not question:
+        raise HTTPException(status_code=400, detail="Question is required")
+
+    with SessionLocal() as session:
+        match_context = fixture_chat_context(session, fixture_id)
+        if match_context is None:
+            raise HTTPException(status_code=404, detail="Fixture not found")
+
+        recommendations = baseline_recommendations_for_fixture(session, fixture_id)
+        opportunity_context = match_opportunity(session, fixture_id, use_ai=False)
+        odds_context = fixture_odds_read(session, fixture_id, limit=5000)
+        context, warnings = bet_chat_context(
+            match_context=match_context,
+            recommendations=recommendations,
+            opportunity=opportunity_context,
+            odds=odds_context,
+        )
+
+    try:
+        with DeepSeekClient.from_settings() as client:
+            answer = client.bet_chat(question=question, context=context)
+    except (DeepSeekError, httpx.HTTPError, OSError, TimeoutError):
+        warnings = [*warnings, "AI provider unavailable; showing deterministic research summary."]
+        return FixtureBetChatResponse(
+            fixture_id=fixture_id,
+            answer=fallback_bet_chat_answer(question=question, context=context),
+            ai_generated=False,
+            ai_provider=None,
+            warnings=warnings,
+        )
+
+    return FixtureBetChatResponse(
+        fixture_id=fixture_id,
+        answer=answer,
+        ai_generated=True,
+        ai_provider=settings.llm_provider,
+        warnings=warnings,
+    )
+
+
+def fixture_chat_context(session, fixture_id: int) -> dict[str, Any] | None:
+    home_team = team.alias("home_team")
+    away_team = team.alias("away_team")
+    row = session.execute(
+        select(
+            fixture.c.id,
+            fixture.c.api_football_id,
+            fixture.c.kickoff_at,
+            league.c.name.label("league"),
+            season.c.year.label("season"),
+            home_team.c.name.label("home_team"),
+            away_team.c.name.label("away_team"),
+            fixture.c.round,
+            fixture.c.status_short,
+            fixture.c.status_long,
+            fixture.c.goals_home,
+            fixture.c.goals_away,
+        )
+        .select_from(
+            fixture.outerjoin(league, fixture.c.league_id == league.c.id)
+            .outerjoin(season, fixture.c.season_id == season.c.id)
+            .outerjoin(home_team, fixture.c.home_team_id == home_team.c.id)
+            .outerjoin(away_team, fixture.c.away_team_id == away_team.c.id)
+        )
+        .where(fixture.c.id == fixture_id)
+    ).mappings().one_or_none()
+    return dict(row) if row is not None else None
+
+
+def bet_chat_context(
+    *,
+    match_context: dict[str, Any],
+    recommendations: list[dict[str, Any]],
+    opportunity: dict[str, Any] | None,
+    odds: FixtureOddsRead,
+) -> tuple[dict[str, Any], list[str]]:
+    warnings = ["Only 1X2 selections are model-backed; other displayed markets are provider price listings."]
+    price_limit = 300
+    flat_prices = [price for provider in odds.providers for price in provider.prices]
+    truncated = len(flat_prices) > price_limit
+    if truncated:
+        warnings.append(f"AI context includes the first {price_limit} of {len(flat_prices)} displayed price rows.")
+
+    provider_summaries = []
+    for provider in odds.providers:
+        provider_summaries.append(
+            {
+                "provider": provider.provider,
+                "provider_fixture_id": provider.provider_fixture_id,
+                "provider_tournament_id": provider.provider_tournament_id,
+                "captured_at": provider.captured_at,
+                "source_endpoint": provider.source_endpoint,
+                "bookmakers": sorted({price.bookmaker_slug for price in provider.prices}),
+                "market_count": len({(price.market_id, price.market_name) for price in provider.prices}),
+                "price_count": len(provider.prices),
+            }
+        )
+
+    price_rows = [
+        {
+            "provider": price.provider,
+            "bookmaker": price.bookmaker_slug,
+            "market_id": price.market_id,
+            "market": price.market_name,
+            "outcome_id": price.outcome_id,
+            "outcome": price.outcome_name,
+            "line": price.line,
+            "decimal_odds": price.price_decimal,
+            "active": price.active,
+            "main_line": price.is_main_line,
+            "changed_at": price.changed_at,
+        }
+        for price in flat_prices[:price_limit]
+    ]
+
+    return (
+        {
+            "fixture": match_context,
+            "tournament": {
+                "league": match_context.get("league"),
+                "season": match_context.get("season"),
+                "round": match_context.get("round"),
+            },
+            "opportunity": opportunity,
+            "recommendations": recommendations,
+            "odds": {
+                "complete_1x2": odds.complete_1x2,
+                "provider_count": len(odds.providers),
+                "bookmaker_count": odds.bookmaker_count,
+                "market_count": odds.market_count,
+                "price_count": len(flat_prices),
+                "latest_price_changed_at": odds.latest_price_changed_at,
+                "providers": provider_summaries,
+                "prices": price_rows,
+                "prices_truncated": truncated,
+            },
+            "rules": {
+                "responsible_gambling": "Research and education only. Not betting advice. 21+.",
+                "model_scope": "Deterministic model recommendations are available for 1X2 only.",
+                "betting_numbers_source": "Do not invent prices, probabilities, EV, edge, confidence, or stakes.",
+            },
+        },
+        warnings,
+    )
+
+
+def fallback_bet_chat_answer(*, question: str, context: dict[str, Any]) -> str:
+    del question
+    fixture_context = context["fixture"]
+    fixture_name = f"{fixture_context.get('home_team') or 'Home'} vs {fixture_context.get('away_team') or 'Away'}"
+    recommendations = context.get("recommendations") if isinstance(context.get("recommendations"), list) else []
+    recommended = [
+        rec
+        for rec in recommendations
+        if isinstance(rec, dict) and rec.get("decision") == "recommend"
+    ]
+    odds_context = context.get("odds") if isinstance(context.get("odds"), dict) else {}
+    market_count = odds_context.get("market_count", 0)
+    provider_count = odds_context.get("provider_count", 0)
+
+    if recommended:
+        top = recommended[0]
+        return (
+            f"For {fixture_name}, the model-backed research angle is {top.get('selection')} "
+            f"at {top.get('decimal_odds')} with EV {top.get('ev_per_unit')} and confidence "
+            f"{top.get('confidence')}. This is based on the 1X2 model only. The odds board also "
+            f"has {market_count} markets from {provider_count} provider(s), but those other markets "
+            "are displayed prices, not model-backed recommendations."
+        )
+
+    if recommendations:
+        reason = recommendations[0].get("reason_code") if isinstance(recommendations[0], dict) else None
+        return (
+            f"For {fixture_name}, there is no model-backed bet right now"
+            f"{f' ({reason})' if reason else ''}. The board still shows {market_count} markets "
+            f"from {provider_count} provider(s) for research, but I would not label any non-1X2 "
+            "market as worth betting without a model signal."
+        )
+
+    return (
+        f"For {fixture_name}, I do not have enough model-backed recommendation data to call a bet. "
+        f"The odds board shows {market_count} markets from {provider_count} provider(s); use them as "
+        "research context only."
+    )
 
 
 @app.get("/research")

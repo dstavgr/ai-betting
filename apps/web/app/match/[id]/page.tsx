@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 
+import { BetChat } from "@/components/BetChat";
 import { EventTimeline } from "@/components/EventTimeline";
 import { LiveBadge } from "@/components/LiveBadge";
 import { MatchTabs } from "@/components/MatchTabs";
+import { OddsBoard } from "@/components/OddsBoard";
 import { RecCard } from "@/components/RecCard";
 import { StatsBars } from "@/components/StatsBars";
 import { TeamCrest } from "@/components/TeamCrest";
@@ -10,7 +12,6 @@ import { WinProbabilityBar } from "@/components/WinProbabilityBar";
 import { FormGuide } from "@/components/widgets/FormGuide";
 import { HeadToHead } from "@/components/widgets/HeadToHead";
 import { MatchFacts } from "@/components/widgets/MatchFacts";
-import { OddsRow } from "@/components/widgets/OddsRow";
 import { SectionCard } from "@/components/ui/section-card";
 import {
   getFixture,
@@ -51,29 +52,33 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   );
 
   const scoreHeader = () => (
-    <section className="text-center">
-      <div className="truncate text-xs text-muted-foreground">
-        {fixture.league ?? defaultLeague.name}
-        {fixture.round ? ` · ${fixture.round}` : ""}
-      </div>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 py-3">
-        <span className="flex min-w-0 items-center justify-end gap-2 text-sm font-medium">
-          <span className="truncate">{home}</span>
-          <TeamCrest name={home} apiFootballId={teamApiFootballIds.get(home)} size={28} />
-        </span>
-        <span className="numeric rounded-md bg-muted px-3 py-1 font-display text-2xl font-bold leading-none">
-          {score(fixture.goals_home, fixture.goals_away)}
-        </span>
-        <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
-          <TeamCrest name={away} apiFootballId={teamApiFootballIds.get(away)} size={28} />
-          <span className="truncate">{away}</span>
-        </span>
-      </div>
-      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-        {liveLabel ? <LiveBadge label={liveLabel} /> : null}
-        <span>
-          {fixture.status_long ?? fixture.status_short ?? "Status unavailable"} · {shortDate(fixture.kickoff_at)}
-        </span>
+    <section className="overflow-hidden rounded-xl border border-border bg-card text-center text-card-foreground shadow-sm">
+      <div className="h-1 bg-primary" />
+      <div className="p-4">
+        <div className="truncate text-xs font-medium text-muted-foreground">
+          {fixture.league ?? defaultLeague.name}
+          {fixture.round ? ` · ${fixture.round}` : ""}
+        </div>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 py-4">
+          <span className="flex min-w-0 items-center justify-end gap-2 text-sm font-semibold">
+            <span className="truncate">{home}</span>
+            <TeamCrest name={home} apiFootballId={teamApiFootballIds.get(home)} size={32} />
+          </span>
+          <span className="numeric rounded-lg border border-border bg-muted px-4 py-2 font-display text-3xl font-bold leading-none shadow-sm">
+            {score(fixture.goals_home, fixture.goals_away)}
+          </span>
+          <span className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+            <TeamCrest name={away} apiFootballId={teamApiFootballIds.get(away)} size={32} />
+            <span className="truncate">{away}</span>
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
+          {liveLabel ? <LiveBadge label={liveLabel} /> : null}
+          <span className="rounded-md bg-muted px-2 py-1">
+            {fixture.status_long ?? fixture.status_short ?? "Status unavailable"}
+          </span>
+          <span className="rounded-md bg-muted px-2 py-1">{shortDate(fixture.kickoff_at)}</span>
+        </div>
       </div>
     </section>
   );
@@ -93,11 +98,18 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     </SectionCard>
   );
 
+  const oddsAndChat = () => (
+    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(18rem,0.75fr)]">
+      <OddsBoard odds={odds} />
+      <BetChat fixtureId={fixture.id} fixtureLabel={`${home} vs ${away}`} />
+    </div>
+  );
+
   const overview = (
     <>
       <WinProbabilityBar recommendations={recommendations} home={home} away={away} />
       <RecCard rec={opportunity?.recommendation ?? recommendations[0] ?? null} />
-      <OddsRow odds={odds} />
+      {oddsAndChat()}
       {formSection()}
       <HeadToHead fixtures={seasonFixtures} homeName={home} awayName={away} />
       <MatchFacts fixture={fixture} />
@@ -115,7 +127,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           {scoreHeader()}
           <WinProbabilityBar recommendations={recommendations} home={home} away={away} />
           <RecCard rec={opportunity?.recommendation ?? recommendations[0] ?? null} />
-          <OddsRow odds={odds} />
+          {oddsAndChat()}
           <StatsBars stats={fixture.team_statistics} />
           <EventTimeline events={fixture.events} />
         </div>

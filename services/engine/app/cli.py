@@ -171,7 +171,7 @@ def main() -> None:
 
     odds_api_io_window = odds_api_io_subcommands.add_parser(
         "sync-prematch-window",
-        help="Sync events and batched 1X2 odds from Odds-API.io for a window.",
+        help="Sync events and batched prematch odds from Odds-API.io for a window.",
     )
     odds_api_io_window.add_argument("--sport", default=settings.odds_api_io_default_sport)
     odds_api_io_window.add_argument("--league", default=settings.odds_api_io_default_league)
@@ -197,7 +197,7 @@ def main() -> None:
 
     odds_api_io_historical_odds = odds_api_io_subcommands.add_parser(
         "sync-historical-mapped-odds",
-        help="Sync closing 1X2 odds for mapped Odds-API.io events.",
+        help="Sync closing odds for mapped Odds-API.io events.",
     )
     odds_api_io_historical_odds.add_argument("--league", default=settings.odds_api_io_default_league)
     odds_api_io_historical_odds.add_argument("--bookmakers", default=settings.odds_api_io_default_bookmakers)

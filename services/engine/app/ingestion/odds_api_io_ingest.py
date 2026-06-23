@@ -466,51 +466,268 @@ def normalize_ml_price_rows(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
             if not isinstance(market, Mapping):
                 continue
             market_name = first_str(market, "name", "market", "marketName")
-            if normalize_market_name(market_name) != "ml":
-                continue
+            normalized_market_name = normalize_market_name(market_name)
             updated_at = parse_datetime(first_str(market, "updatedAt", "updated_at", "lastUpdate"))
-            odds_entries = market.get("odds")
-            if isinstance(odds_entries, Mapping):
-                odds_rows = [odds_entries]
-            elif isinstance(odds_entries, list):
-                odds_rows = [entry for entry in odds_entries if isinstance(entry, Mapping)]
-            else:
-                odds_rows = [market]
-            for odds_row in odds_rows:
-                for provider_outcome, (outcome_id, outcome_name) in OUTCOME_MAP_1X2.items():
-                    price_decimal = first_float(odds_row, provider_outcome)
-                    if price_decimal is None:
-                        continue
-                    rows.append(
-                        {
-                            "bookmaker_slug": bookmaker_slug,
-                            "market_id": MARKET_ID_1X2,
-                            "market_name": MARKET_NAME_1X2,
-                            "outcome_id": outcome_id,
-                            "outcome_name": outcome_name,
-                            "bookmaker_outcome_id": provider_outcome,
-                            "player_key": "0",
-                            "player_name": None,
-                            "line": None,
-                            "price_decimal": price_decimal,
-                            "price_american": first_str(odds_row, f"{provider_outcome}American"),
-                            "price_fractional": None,
-                            "active": True,
-                            "is_main_line": True,
-                            "limit_amount": None,
-                            "bookmaker_changed_at": updated_at,
-                            "changed_at": updated_at,
-                            "metadata": {
-                                "provider_event_id": provider_event_id,
-                                "provider_bookmaker_name": str(bookmaker_name),
-                                "provider_market_name": market_name,
-                                "provider_outcome": provider_outcome,
-                                "bet_link": first_str(odds_row, "link", "betLink", "url"),
-                            },
-                            "raw_payload": dict(odds_row),
-                        }
+            for odds_row in odds_rows_for_market(market):
+                if normalized_market_name == "ml":
+                    rows.extend(
+                        normalize_1x2_price_rows(
+                            odds_row,
+                            bookmaker_slug=bookmaker_slug,
+                            bookmaker_name=str(bookmaker_name),
+                            market_name=market_name,
+                            provider_event_id=provider_event_id,
+                            updated_at=updated_at,
+                        )
                     )
+                    continue
+
+                rows.extend(
+                    normalize_generic_price_rows(
+                        odds_row,
+                        bookmaker_slug=bookmaker_slug,
+                        bookmaker_name=str(bookmaker_name),
+                        market_name=market_name,
+                        provider_event_id=provider_event_id,
+                        updated_at=updated_at,
+                    )
+                )
     return rows
+
+
+def odds_rows_for_market(market: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    odds_entries = market.get("odds")
+    if isinstance(odds_entries, Mapping):
+        return [odds_entries]
+    if isinstance(odds_entries, list):
+        return [entry for entry in odds_entries if isinstance(entry, Mapping)]
+    return [market]
+
+
+def normalize_1x2_price_rows(
+    odds_row: Mapping[str, Any],
+    *,
+    bookmaker_slug: str,
+    bookmaker_name: str,
+    market_name: str | None,
+    provider_event_id: str | None,
+    updated_at: datetime | None,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for provider_outcome, (outcome_id, outcome_name) in OUTCOME_MAP_1X2.items():
+        price_decimal = first_float(odds_row, provider_outcome)
+        if price_decimal is None:
+            continue
+        rows.append(
+            price_row(
+                odds_row,
+                bookmaker_slug=bookmaker_slug,
+                bookmaker_name=bookmaker_name,
+                market_id=MARKET_ID_1X2,
+                market_name=MARKET_NAME_1X2,
+                outcome_id=outcome_id,
+                outcome_name=outcome_name,
+                bookmaker_outcome_id=provider_outcome,
+                price_decimal=price_decimal,
+                provider_event_id=provider_event_id,
+                provider_market_name=market_name,
+                provider_outcome=provider_outcome,
+                line=None,
+                price_american=first_str(odds_row, f"{provider_outcome}American"),
+                updated_at=updated_at,
+            )
+        )
+    return rows
+
+
+def normalize_generic_price_rows(
+    odds_row: Mapping[str, Any],
+    *,
+    bookmaker_slug: str,
+    bookmaker_name: str,
+    market_name: str | None,
+    provider_event_id: str | None,
+    updated_at: datetime | None,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    single_outcome = first_str(odds_row, "name", "label", "outcome", "selection")
+    single_price = first_float(odds_row, "price", "decimal", "odds")
+    market_label = market_name or "Market"
+    market_id = provider_market_id(market_label)
+
+    if single_outcome and single_price is not None:
+        rows.append(
+            price_row(
+                odds_row,
+                bookmaker_slug=bookmaker_slug,
+                bookmaker_name=bookmaker_name,
+                market_id=market_id,
+                market_name=market_label,
+                outcome_id=provider_outcome_id(single_outcome),
+                outcome_name=single_outcome,
+                bookmaker_outcome_id=single_outcome,
+                price_decimal=single_price,
+                provider_event_id=provider_event_id,
+                provider_market_name=market_name,
+                provider_outcome=single_outcome,
+                line=line_from_context(odds_row, single_outcome),
+                price_american=first_str(odds_row, "american", "priceAmerican"),
+                updated_at=updated_at,
+            )
+        )
+
+    for key, value in odds_row.items():
+        if should_skip_generic_outcome_key(key):
+            continue
+        price_decimal = price_from_provider_value(value)
+        if price_decimal is None:
+            continue
+
+        outcome_name = outcome_name_from_provider_value(key, value)
+        rows.append(
+            price_row(
+                odds_row if not isinstance(value, Mapping) else value,
+                bookmaker_slug=bookmaker_slug,
+                bookmaker_name=bookmaker_name,
+                market_id=market_id,
+                market_name=market_label,
+                outcome_id=provider_outcome_id(key),
+                outcome_name=outcome_name,
+                bookmaker_outcome_id=key,
+                price_decimal=price_decimal,
+                provider_event_id=provider_event_id,
+                provider_market_name=market_name,
+                provider_outcome=key,
+                line=line_from_context(value if isinstance(value, Mapping) else odds_row, key),
+                price_american=(
+                    first_str(value, "american", "priceAmerican")
+                    if isinstance(value, Mapping)
+                    else first_str(odds_row, f"{key}American")
+                ),
+                updated_at=updated_at,
+            )
+        )
+    return rows
+
+
+def price_row(
+    raw_payload: Mapping[str, Any],
+    *,
+    bookmaker_slug: str,
+    bookmaker_name: str,
+    market_id: str,
+    market_name: str,
+    outcome_id: str,
+    outcome_name: str,
+    bookmaker_outcome_id: str,
+    price_decimal: float,
+    provider_event_id: str | None,
+    provider_market_name: str | None,
+    provider_outcome: str,
+    line: float | None,
+    price_american: str | None,
+    updated_at: datetime | None,
+) -> dict[str, Any]:
+    return {
+        "bookmaker_slug": bookmaker_slug,
+        "market_id": market_id,
+        "market_name": market_name,
+        "outcome_id": outcome_id,
+        "outcome_name": outcome_name,
+        "bookmaker_outcome_id": bookmaker_outcome_id,
+        "player_key": "0",
+        "player_name": None,
+        "line": line,
+        "price_decimal": price_decimal,
+        "price_american": price_american,
+        "price_fractional": None,
+        "active": True,
+        "is_main_line": True,
+        "limit_amount": None,
+        "bookmaker_changed_at": updated_at,
+        "changed_at": updated_at,
+        "metadata": {
+            "provider_event_id": provider_event_id,
+            "provider_bookmaker_name": bookmaker_name,
+            "provider_market_name": provider_market_name,
+            "provider_outcome": provider_outcome,
+            "bet_link": first_str(raw_payload, "link", "betLink", "url"),
+        },
+        "raw_payload": dict(raw_payload),
+    }
+
+
+GENERIC_OUTCOME_SKIP_KEYS = {
+    "id",
+    "key",
+    "name",
+    "label",
+    "market",
+    "marketname",
+    "updatedat",
+    "updated_at",
+    "lastupdate",
+    "link",
+    "betlink",
+    "url",
+    "line",
+    "point",
+    "points",
+    "handicap",
+    "total",
+    "price",
+    "decimal",
+    "odds",
+    "american",
+    "priceamerican",
+}
+
+
+def should_skip_generic_outcome_key(key: str) -> bool:
+    normalized = normalize_market_name(key)
+    return normalized in GENERIC_OUTCOME_SKIP_KEYS or normalized.endswith("american")
+
+
+def price_from_provider_value(value: Any) -> float | None:
+    if isinstance(value, Mapping):
+        return first_float(value, "price", "decimal", "odds", "value")
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return float(str(value).replace(",", ""))
+    except (TypeError, ValueError):
+        return None
+
+
+def outcome_name_from_provider_value(key: str, value: Any) -> str:
+    if isinstance(value, Mapping):
+        name = first_str(value, "name", "label", "outcome", "selection")
+        if name:
+            return name
+    return humanize_provider_key(key)
+
+
+def provider_market_id(value: str) -> str:
+    normalized = normalize_market_name(value) or "market"
+    return f"odds_api_io:{normalized}"[:120]
+
+
+def provider_outcome_id(value: str) -> str:
+    normalized = normalize_market_name(value) or "outcome"
+    return normalized[:120]
+
+
+def humanize_provider_key(value: str) -> str:
+    text = re.sub(r"[_-]+", " ", value).strip()
+    return text.upper() if len(text) <= 3 else text.title()
+
+
+def line_from_context(payload: Mapping[str, Any], outcome_key: str) -> float | None:
+    line = first_float(payload, "line", "point", "points", "handicap", "total")
+    if line is not None:
+        return line
+    match = re.search(r"-?\d+(?:\.\d+)?", outcome_key)
+    return float(match.group(0)) if match else None
 
 
 def bookmaker_odds(payload: Mapping[str, Any]) -> Mapping[str, Any]:

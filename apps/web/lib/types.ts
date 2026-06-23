@@ -210,6 +210,7 @@ export type FeatureSnapshot = {
 
 export type OddsPrice = {
   id: number;
+  provider: string;
   bookmaker_slug: string;
   market_id: string;
   market_name: string | null;
@@ -224,6 +225,21 @@ export type OddsPrice = {
   active: boolean | null;
   is_main_line: boolean | null;
   changed_at: string | null;
+  metadata: Record<string, unknown>;
+};
+
+export type FixtureOddsProvider = {
+  provider: string;
+  snapshot_id: number;
+  provider_fixture_id: string | null;
+  provider_tournament_id: string | null;
+  captured_at: string | null;
+  source_endpoint: string | null;
+  bookmaker_count: number;
+  market_count: number;
+  outcome_count: number;
+  latest_price_changed_at: string | null;
+  prices: OddsPrice[];
 };
 
 export type FixtureOdds = {
@@ -239,7 +255,16 @@ export type FixtureOdds = {
   outcome_count: number;
   latest_price_changed_at: string | null;
   complete_1x2: boolean;
+  providers?: FixtureOddsProvider[];
   prices: OddsPrice[];
+};
+
+export type FixtureBetChatResponse = {
+  fixture_id: number;
+  answer: string;
+  ai_generated: boolean;
+  ai_provider: string | null;
+  warnings: string[];
 };
 
 export type Standing = {

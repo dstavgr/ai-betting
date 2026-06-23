@@ -58,5 +58,38 @@ def test_deepseek_client_generates_opportunity_copy() -> None:
     assert seen_request.headers["authorization"] == "Bearer secret"
 
 
+def test_deepseek_client_generates_bet_chat_answer() -> None:
+    seen_request: httpx.Request | None = None
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal seen_request
+        seen_request = request
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "No model-backed bet. Watch the 1X2 board only."}}]},
+        )
+
+    client = DeepSeekClient(
+        api_key="secret",
+        base_url="https://example.test",
+        model="deepseek-chat",
+        transport=httpx.MockTransport(handler),
+    )
+
+    answer = client.bet_chat(
+        question="What is worth betting on?",
+        context={
+            "fixture": {"home_team": "AEK Athens", "away_team": "PAOK", "league": "Super League 1"},
+            "recommendations": [],
+            "odds": {"providers": [], "prices": []},
+        },
+    )
+
+    assert answer == "No model-backed bet. Watch the 1X2 board only."
+    assert seen_request is not None
+    assert seen_request.url.path == "/chat/completions"
+    assert seen_request.headers["authorization"] == "Bearer secret"
+
+
 def test_parse_json_content_allows_fenced_json() -> None:
     assert parse_json_content('```json\n{"headline":"A"}\n```') == {"headline": "A"}

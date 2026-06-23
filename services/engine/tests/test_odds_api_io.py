@@ -63,6 +63,32 @@ def test_normalize_ml_price_rows_maps_football_1x2() -> None:
     assert rows[0]["changed_at"].isoformat() == "2026-04-13T09:24:47+00:00"
 
 
+def test_normalize_ml_price_rows_keeps_non_ml_markets() -> None:
+    payload = {
+        "id": "event-1",
+        "bookmakers": {
+            "Novibet": [
+                {
+                    "name": "Total Goals",
+                    "updatedAt": "2026-04-13T09:24:47Z",
+                    "odds": [{"points": "2.5", "over": "1.91", "under": "1.93"}],
+                },
+                {
+                    "name": "Both Teams To Score",
+                    "odds": [{"yes": {"price": "1.80"}, "no": {"price": "2.05"}}],
+                },
+            ]
+        },
+    }
+
+    rows = normalize_ml_price_rows(payload)
+
+    assert {row["market_name"] for row in rows} == {"Total Goals", "Both Teams To Score"}
+    assert {row["outcome_name"] for row in rows} == {"Over", "Under", "Yes", "No"}
+    assert {row["line"] for row in rows if row["market_name"] == "Total Goals"} == {2.5}
+    assert {row["price_decimal"] for row in rows} == {1.91, 1.93, 1.8, 2.05}
+
+
 def test_canonical_bookmaker_slug_handles_greek_books() -> None:
     assert canonical_bookmaker_slug("Novibet") == "novibet"
     assert canonical_bookmaker_slug("Stoiximan") == "stoiximan"

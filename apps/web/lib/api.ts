@@ -1,6 +1,7 @@
 import type {
   DataSummary,
   FeatureSnapshot,
+  FixtureBetChatResponse,
   Fixture,
   FixtureDetail,
   FixtureOdds,
@@ -22,6 +23,21 @@ async function fetchJson<T>(path: string): Promise<T> {
   const response = await fetch(`${engineUrl}${path}`, {
     cache: "no-store",
     headers: { Accept: "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Engine request failed: ${response.status}`);
+  }
+
+  return response.json() as Promise<T>;
+}
+
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${engineUrl}${path}`, {
+    method: "POST",
+    cache: "no-store",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
@@ -127,7 +143,7 @@ export async function getFixtureFeatures(id: string | number): Promise<FeatureSn
 
 export async function getFixtureOdds(id: string | number): Promise<FixtureOdds | null> {
   try {
-    return await fetchJson<FixtureOdds>(`/data/fixtures/${id}/odds`);
+    return await fetchJson<FixtureOdds>(`/data/fixtures/${id}/odds?limit=5000`);
   } catch {
     return null;
   }
@@ -139,4 +155,11 @@ export async function getFixtureRecommendations(id: string | number): Promise<Re
   } catch {
     return [];
   }
+}
+
+export async function askFixtureBetChat(
+  id: string | number,
+  question: string,
+): Promise<FixtureBetChatResponse> {
+  return postJson<FixtureBetChatResponse>(`/data/fixtures/${id}/bet-chat`, { question });
 }

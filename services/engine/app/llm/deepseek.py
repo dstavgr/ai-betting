@@ -102,6 +102,28 @@ class DeepSeekClient:
             model_note=clean_text(values.get("model_note"), fallback=str(opportunity["model_note"]), max_length=140),
         )
 
+    def bet_chat(self, *, question: str, context: Mapping[str, Any]) -> str:
+        response = self._client.post(
+            "/chat/completions",
+            headers=self._headers,
+            json={
+                "model": self.model,
+                "messages": bet_chat_messages(question=question, context=context),
+                "temperature": 0.2,
+                "max_tokens": 520,
+            },
+        )
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise DeepSeekError("DeepSeek returned a non-JSON response.") from exc
+
+        if response.status_code >= 400:
+            raise DeepSeekError(f"DeepSeek error: {error_message(payload) or response.reason_phrase}")
+
+        content = extract_message_content(payload)
+        return clean_text(content, fallback="No research answer is available for this match yet.", max_length=1800)
+
 
 def opportunity_messages(opportunity: Mapping[str, Any]) -> list[dict[str, str]]:
     recommendation = opportunity.get("recommendation") if isinstance(opportunity.get("recommendation"), Mapping) else None
@@ -142,6 +164,34 @@ def opportunity_messages(opportunity: Mapping[str, Any]) -> list[dict[str, str]]
                 "Rewrite the copy as JSON with keys headline, interesting_fact, historical_angle, model_note. "
                 "Keep it specific, plain, and short. Use only this data:\n"
                 f"{json.dumps(payload, default=str, sort_keys=True)}"
+            ),
+        },
+    ]
+
+
+def bet_chat_messages(*, question: str, context: Mapping[str, Any]) -> list[dict[str, str]]:
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are Bet AI's fixture-specific football betting research assistant. "
+                "Answer only for the match and tournament in the supplied payload. "
+                "Use only the supplied fixture, tournament, recommendations, and odds. "
+                "Never invent markets, prices, probabilities, EV, edge, confidence, injuries, lineups, news, or stakes. "
+                "The deterministic model is scoped to 1X2 only; other markets are provider price listings unless the payload says otherwise. "
+                "If there is no recommend decision, say there is no model-backed bet. "
+                "When asked what is worth betting on, rank research angles by recommendation decision, EV, edge, confidence, and price freshness. "
+                "Mention provider and bookmaker when citing odds. "
+                "Keep it concise and plain. No guarantees, urgency, parlays, chasing losses, or financial advice. "
+                "Always preserve the frame: research and education only, not betting advice, 21+."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Question: {question}\n\n"
+                "Answer using only this JSON context:\n"
+                f"{json.dumps(context, default=str, sort_keys=True)}"
             ),
         },
     ]
