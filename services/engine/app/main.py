@@ -42,6 +42,7 @@ from app.modeling import (
     evaluate_walkforward,
 )
 from app.modeling.opportunities import match_opportunities, match_opportunity
+from app.news.service import fixture_news_assessment
 
 app = FastAPI(
     title="Soccer Betting Analytics Engine",
@@ -748,6 +749,15 @@ def data_fixture_markets(fixture_id: int) -> dict[str, Any]:
         return fixture_markets(session, fixture_id)
 
 
+@app.get("/data/fixtures/{fixture_id}/news")
+def data_fixture_news(fixture_id: int) -> dict[str, Any]:
+    with SessionLocal() as session:
+        try:
+            return fixture_news_assessment(session, fixture_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail="Fixture not found") from exc
+
+
 @app.post("/data/fixtures/{fixture_id}/bet-chat", response_model=FixtureBetChatResponse)
 def data_fixture_bet_chat(fixture_id: int, request: FixtureBetChatRequest, http_request: Request) -> FixtureBetChatResponse:
     # SECURITY: LLM10 (Endpoint Hardening) - per-client + global rate limit / circuit breaker
@@ -768,11 +778,13 @@ def data_fixture_bet_chat(fixture_id: int, request: FixtureBetChatRequest, http_
         recommendations = baseline_recommendations_for_fixture(session, fixture_id)
         opportunity_context = match_opportunity(session, fixture_id, use_ai=False)
         odds_context = fixture_odds_read(session, fixture_id, limit=5000)
+        news_context = fixture_news_assessment(session, fixture_id)
         context, warnings = bet_chat_context(
             match_context=match_context,
             recommendations=recommendations,
             opportunity=opportunity_context,
             odds=odds_context,
+            news=news_context,
         )
 
     try:
@@ -832,6 +844,7 @@ def bet_chat_context(
     recommendations: list[dict[str, Any]],
     opportunity: dict[str, Any] | None,
     odds: FixtureOddsRead,
+    news: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], list[str]]:
     warnings = ["Only 1X2 selections are model-backed; other displayed markets are provider price listings."]
     price_limit = 300
@@ -893,6 +906,7 @@ def bet_chat_context(
                 "prices": price_rows,
                 "prices_truncated": truncated,
             },
+            "team_news": _bet_chat_news_context(news),
             "rules": {
                 "responsible_gambling": "Research and education only. Not betting advice. 21+.",
                 "model_scope": "Deterministic model recommendations are available for 1X2 only.",
@@ -901,6 +915,29 @@ def bet_chat_context(
         },
         warnings,
     )
+
+
+def _bet_chat_news_context(news: dict[str, Any] | None) -> dict[str, Any]:
+    if not news:
+        return {
+            "home_top_signals": [],
+            "away_top_signals": [],
+            "news_adjusted": None,
+            "disclaimer": "No team-news signals are available.",
+        }
+    home_bundle = news.get("home_bundle") if isinstance(news.get("home_bundle"), dict) else {}
+    away_bundle = news.get("away_bundle") if isinstance(news.get("away_bundle"), dict) else {}
+    news_adjusted = news.get("news_adjusted") if isinstance(news.get("news_adjusted"), dict) else {}
+    return {
+        "home_top_signals": home_bundle.get("top_signals", []),
+        "away_top_signals": away_bundle.get("top_signals", []),
+        "news_adjusted": {
+            "suggested_direction": news_adjusted.get("suggested_direction"),
+            "confidence": news_adjusted.get("confidence"),
+            "disclaimer": news_adjusted.get("disclaimer"),
+        },
+        "disclaimer": news.get("disclaimer"),
+    }
 
 
 def fallback_bet_chat_answer(*, question: str, context: dict[str, Any]) -> str:
