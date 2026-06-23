@@ -259,6 +259,35 @@ export type FixtureOdds = {
   prices: OddsPrice[];
 };
 
+export type MarketOutcomePrice = {
+  bookmaker_slug: string;
+  decimal_odds: number;
+};
+
+export type MarketOutcome = {
+  outcome_name: string | null;
+  line: number | null;
+  best_odds: number | null;
+  prices: MarketOutcomePrice[];
+};
+
+export type Market = {
+  market_name: string;
+  group: string;
+  outcomes: MarketOutcome[];
+};
+
+export type MarketGroup = {
+  group: string;
+  markets: Market[];
+};
+
+export type FixtureMarkets = {
+  fixture_id: number;
+  market_count: number;
+  groups: MarketGroup[];
+};
+
 export type FixtureBetChatResponse = {
   fixture_id: number;
   answer: string;

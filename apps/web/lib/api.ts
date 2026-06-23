@@ -4,6 +4,7 @@ import type {
   FixtureBetChatResponse,
   Fixture,
   FixtureDetail,
+  FixtureMarkets,
   FixtureOdds,
   Health,
   Match,
@@ -144,6 +145,14 @@ export async function getFixtureFeatures(id: string | number): Promise<FeatureSn
 export async function getFixtureOdds(id: string | number): Promise<FixtureOdds | null> {
   try {
     return await fetchJson<FixtureOdds>(`/data/fixtures/${id}/odds?limit=5000`);
+  } catch {
+    return null;
+  }
+}
+
+export async function getFixtureMarkets(id: string | number): Promise<FixtureMarkets | null> {
+  try {
+    return await fetchJson<FixtureMarkets>("/data/fixtures/" + id + "/markets");
   } catch {
     return null;
   }

@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation";
 
-import { BetChat } from "@/components/BetChat";
+import { ChatPanel } from "@/components/ChatPanel";
 import { EventTimeline } from "@/components/EventTimeline";
 import { LiveBadge } from "@/components/LiveBadge";
+import { MarketsBoard } from "@/components/MarketsBoard";
 import { MatchTabs } from "@/components/MatchTabs";
-import { OddsBoard } from "@/components/OddsBoard";
 import { RecCard } from "@/components/RecCard";
 import { StatsBars } from "@/components/StatsBars";
 import { TeamCrest } from "@/components/TeamCrest";
@@ -15,7 +15,7 @@ import { MatchFacts } from "@/components/widgets/MatchFacts";
 import { SectionCard } from "@/components/ui/section-card";
 import {
   getFixture,
-  getFixtureOdds,
+  getFixtureMarkets,
   getFixtureOpportunity,
   getFixtureRecommendations,
   getSeasonFixtures,
@@ -29,13 +29,13 @@ export const dynamic = "force-dynamic";
 
 export default async function MatchPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [fixture, opportunity, recommendations, teams, seasonFixtures, odds] = await Promise.all([
+  const [fixture, opportunity, recommendations, teams, seasonFixtures, markets] = await Promise.all([
     getFixture(id),
     getFixtureOpportunity(id),
     getFixtureRecommendations(id),
     getTeams(),
     getSeasonFixtures(),
-    getFixtureOdds(id),
+    getFixtureMarkets(id),
   ]);
 
   if (!fixture) {
@@ -98,18 +98,11 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     </SectionCard>
   );
 
-  const oddsAndChat = () => (
-    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(18rem,0.75fr)]">
-      <OddsBoard odds={odds} />
-      <BetChat fixtureId={fixture.id} fixtureLabel={`${home} vs ${away}`} />
-    </div>
-  );
-
   const overview = (
     <>
       <WinProbabilityBar recommendations={recommendations} home={home} away={away} />
       <RecCard rec={opportunity?.recommendation ?? recommendations[0] ?? null} />
-      {oddsAndChat()}
+      <MarketsBoard markets={markets} />
       {formSection()}
       <HeadToHead fixtures={seasonFixtures} homeName={home} awayName={away} />
       <MatchFacts fixture={fixture} />
@@ -117,34 +110,34 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   );
 
   return (
-    <div className="space-y-4">
-      <div className="lg:hidden">
-        {scoreHeader()}
-      </div>
+    <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="min-w-0 space-y-4">
+        <div className="lg:hidden">
+          {scoreHeader()}
+        </div>
 
-      <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="space-y-4">
+        <div className="hidden space-y-4 lg:block">
           {scoreHeader()}
           <WinProbabilityBar recommendations={recommendations} home={home} away={away} />
           <RecCard rec={opportunity?.recommendation ?? recommendations[0] ?? null} />
-          {oddsAndChat()}
+          <MarketsBoard markets={markets} />
           <StatsBars stats={fixture.team_statistics} />
-          <EventTimeline events={fixture.events} />
-        </div>
-        <div className="space-y-4">
           {formSection()}
           <HeadToHead fixtures={seasonFixtures} homeName={home} awayName={away} />
           <MatchFacts fixture={fixture} />
+          <EventTimeline events={fixture.events} />
+        </div>
+
+        <div className="lg:hidden">
+          <MatchTabs
+            overview={overview}
+            stats={<StatsBars stats={fixture.team_statistics} />}
+            timeline={<EventTimeline events={fixture.events} />}
+          />
         </div>
       </div>
 
-      <div className="lg:hidden">
-        <MatchTabs
-          overview={overview}
-          stats={<StatsBars stats={fixture.team_statistics} />}
-          timeline={<EventTimeline events={fixture.events} />}
-        />
-      </div>
+      <ChatPanel fixtureId={fixture.id} fixtureLabel={`${home} vs ${away}`} />
     </div>
   );
 }
