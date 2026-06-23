@@ -2,8 +2,9 @@ from datetime import UTC, datetime
 from typing import Any
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from app import ratelimit
 from pydantic import BaseModel
 from sqlalchemy import desc, func, select
 
@@ -741,10 +742,16 @@ def data_fixture_recommendations(fixture_id: int) -> list[Recommendation]:
 
 
 @app.post("/data/fixtures/{fixture_id}/bet-chat", response_model=FixtureBetChatResponse)
-def data_fixture_bet_chat(fixture_id: int, request: FixtureBetChatRequest) -> FixtureBetChatResponse:
+def data_fixture_bet_chat(fixture_id: int, request: FixtureBetChatRequest, http_request: Request) -> FixtureBetChatResponse:
+    # SECURITY: LLM10 (Endpoint Hardening) - per-client + global rate limit / circuit breaker
+    # on the public, no-auth LLM endpoint. llm-secure-patterns / LLM Endpoint Hardening, 2026-06-23.
+    ratelimit.enforce(http_request)
     question = " ".join(request.question.split())
     if not question:
         raise HTTPException(status_code=400, detail="Question is required")
+    # SECURITY: LLM10 input cap - bounds input tokens / denial-of-wallet. 2026-06-23.
+    if len(question) > 600:
+        raise HTTPException(status_code=413, detail="Question is too long (max 600 characters).")
 
     with SessionLocal() as session:
         match_context = fixture_chat_context(session, fixture_id)

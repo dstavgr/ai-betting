@@ -29,6 +29,15 @@ _LEAGUES: dict[str, LeagueConfig] = {
         "greece-super-league",
         2025,
     ),
+    "world-cup": LeagueConfig(
+        "world-cup",
+        "World Cup",
+        1,
+        "",
+        10,
+        "",
+        2026,
+    ),
 }
 
 
