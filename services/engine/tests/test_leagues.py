@@ -24,8 +24,9 @@ def test_registry_contains_greek_super_league() -> None:
         "greece-super-league",
         2025,
     )
-    assert all_leagues() == (league,)
-    assert all_api_football_ids() == (197,)
+    world_cup = get_league("world-cup")
+    assert all_leagues() == (league, world_cup)
+    assert all_api_football_ids() == (197, 1)
 
 
 def test_default_league_uses_default_key(monkeypatch: pytest.MonkeyPatch) -> None:

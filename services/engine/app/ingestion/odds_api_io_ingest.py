@@ -719,7 +719,13 @@ def provider_outcome_id(value: str) -> str:
 
 def humanize_provider_key(value: str) -> str:
     text = re.sub(r"[_-]+", " ", value).strip()
-    return text.upper() if len(text) <= 3 else text.title()
+    if not text:
+        return text
+    # Word-like outcomes (Yes/No/Over/Under) in Title Case; only uppercase codes
+    # that contain a digit (e.g. handicap/total codes).
+    if any(ch.isdigit() for ch in text):
+        return text.upper()
+    return text.title()
 
 
 def line_from_context(payload: Mapping[str, Any], outcome_key: str) -> float | None:
