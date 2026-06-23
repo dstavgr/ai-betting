@@ -5,6 +5,7 @@ import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app import ratelimit
+from app.markets import fixture_markets
 from pydantic import BaseModel
 from sqlalchemy import desc, func, select
 
@@ -739,6 +740,12 @@ def fixture_odds_read(session, fixture_id: int, *, limit: int = 5000) -> Fixture
 def data_fixture_recommendations(fixture_id: int) -> list[Recommendation]:
     with SessionLocal() as session:
         return [Recommendation(**row) for row in baseline_recommendations_for_fixture(session, fixture_id)]
+
+
+@app.get("/data/fixtures/{fixture_id}/markets")
+def data_fixture_markets(fixture_id: int) -> dict[str, Any]:
+    with SessionLocal() as session:
+        return fixture_markets(session, fixture_id)
 
 
 @app.post("/data/fixtures/{fixture_id}/bet-chat", response_model=FixtureBetChatResponse)
