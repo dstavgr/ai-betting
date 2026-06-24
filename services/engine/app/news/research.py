@@ -43,7 +43,7 @@ def assess_team_news(
         source = registry.get(article.source_domain) or _unknown_source(article.source_domain)
         classification = classify_article(team=team, article=article)
         weight = compute_article_weight(
-            source_reliability=source.reliability_score,
+            source_reliability=registry.effective_reliability(article.source_domain, team),
             published_at=article.published_at,
             category=classification.category,
             match_relevance=classification.match_relevance,

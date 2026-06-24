@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+K = 5.0
+
 
 class SourceTier(str, Enum):
     OFFICIAL_CLUB = "OFFICIAL_CLUB"
@@ -50,10 +52,21 @@ class NewsSource:
 class SourceRegistry:
     """In-memory source registry with deterministic reliability updates."""
 
-    def __init__(self, sources: list[NewsSource] | None = None) -> None:
+    def __init__(
+        self,
+        sources: list[NewsSource] | None = None,
+        team_reliability: dict[tuple[str, str], dict[str, int]] | None = None,
+    ) -> None:
         seed_sources = sources if sources is not None else _seed_sources()
         self._by_domain = {_normalize_domain(source.domain): source for source in seed_sources}
         self._by_id = {source.id: source for source in seed_sources}
+        self._team_reliability = {
+            key: {
+                "team_mentions": int(value.get("team_mentions", 0)),
+                "team_confirmations": int(value.get("team_confirmations", 0)),
+            }
+            for key, value in (team_reliability or {}).items()
+        }
 
     def get(self, domain: str) -> NewsSource | None:
         return self._by_domain.get(_normalize_domain(domain))
@@ -61,7 +74,42 @@ class SourceRegistry:
     def all(self) -> list[NewsSource]:
         return list(self._by_id.values())
 
-    def update_reliability(self, source_id: str, confirmed: bool) -> NewsSource:
+    def team_reliability_counts(self) -> dict[tuple[str, str], dict[str, int]]:
+        return {
+            key: {
+                "team_mentions": value["team_mentions"],
+                "team_confirmations": value["team_confirmations"],
+            }
+            for key, value in self._team_reliability.items()
+        }
+
+    def effective_reliability(self, domain: str, team: str) -> float:
+        source = self.get(domain)
+        if source is None:
+            return 0.0
+        counts = self._team_reliability.get(
+            (source.id, team),
+            {"team_mentions": 0, "team_confirmations": 0},
+        )
+        team_mentions = counts["team_mentions"]
+        team_confirmations = counts["team_confirmations"]
+        return _clamp(
+            (K * source.reliability_score + team_confirmations) / (K + team_mentions),
+            0.0,
+            1.0,
+        )
+
+    def update_reliability(
+        self,
+        source_id: str,
+        team: str | bool | None = None,
+        confirmed: bool | None = None,
+    ) -> NewsSource:
+        if isinstance(team, bool) and confirmed is None:
+            confirmed = team
+            team = None
+        if confirmed is None:
+            confirmed = False
         source = self._by_id[source_id]
         source.mentions += 1
         if confirmed:
@@ -69,6 +117,14 @@ class SourceRegistry:
             source.reliability_score = min(1.0, source.reliability_score + 0.04)
         else:
             source.reliability_score = max(0.0, source.reliability_score - 0.04)
+        if team is not None:
+            counts = self._team_reliability.setdefault(
+                (source_id, team),
+                {"team_mentions": 0, "team_confirmations": 0},
+            )
+            counts["team_mentions"] += 1
+            if confirmed:
+                counts["team_confirmations"] += 1
         return source
 
 
@@ -125,3 +181,6 @@ def _normalize_domain(domain: str) -> str:
         value = value[4:]
     return value
 
+
+def _clamp(value: float, low: float, high: float) -> float:
+    return max(low, min(high, value))

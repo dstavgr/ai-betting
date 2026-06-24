@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-from app.db.models import news_assessment, news_source
+from app.db.models import news_assessment, news_source, news_source_team
 from app.news import sources
 from app.news.sources import NewsSource, SourceRegistry, SourceTier
 
@@ -15,7 +15,11 @@ from app.news.sources import NewsSource, SourceRegistry, SourceTier
 def load_registry(session) -> SourceRegistry:
     rows = session.execute(select(news_source)).mappings().all()
     if rows:
-        return SourceRegistry([_source_from_row(row) for row in rows])
+        team_rows = session.execute(select(news_source_team)).mappings().all()
+        return SourceRegistry(
+            [_source_from_row(row) for row in rows],
+            team_reliability=_team_reliability_from_rows(team_rows),
+        )
 
     registry = SourceRegistry(sources._seed_sources())
     persist_registry(session, registry)
@@ -25,13 +29,35 @@ def load_registry(session) -> SourceRegistry:
 def persist_registry(session, registry: SourceRegistry) -> None:
     for source in registry.all():
         _upsert_source(session, source)
+    for (source_id, team), counts in registry.team_reliability_counts().items():
+        _upsert_source_team(
+            session,
+            source_id=source_id,
+            team=team,
+            team_mentions=counts["team_mentions"],
+            team_confirmations=counts["team_confirmations"],
+        )
     session.commit()
 
 
-def record_confirmation(session, source_id: str, confirmed: bool) -> NewsSource:
+def record_confirmation(
+    session,
+    source_id: str,
+    team: str | None = None,
+    confirmed: bool = False,
+) -> NewsSource:
     registry = load_registry(session)
-    source = registry.update_reliability(source_id, confirmed)
+    source = registry.update_reliability(source_id, team, confirmed)
     _upsert_source(session, source)
+    if team is not None:
+        counts = registry.team_reliability_counts()[(source_id, team)]
+        _upsert_source_team(
+            session,
+            source_id=source_id,
+            team=team,
+            team_mentions=counts["team_mentions"],
+            team_confirmations=counts["team_confirmations"],
+        )
     session.commit()
     return source
 
@@ -103,6 +129,34 @@ def _upsert_source(session, source: NewsSource) -> None:
     session.execute(stmt)
 
 
+def _upsert_source_team(
+    session,
+    *,
+    source_id: str,
+    team: str,
+    team_mentions: int,
+    team_confirmations: int,
+) -> None:
+    values = {
+        "source_id": source_id,
+        "team": team,
+        "team_mentions": team_mentions,
+        "team_confirmations": team_confirmations,
+        "updated_at": datetime.now(UTC),
+    }
+    dialect = session.get_bind().dialect.name
+    insert_stmt = _insert(news_source_team, dialect).values(**values)
+    stmt = insert_stmt.on_conflict_do_update(
+        index_elements=["source_id", "team"],
+        set_={
+            "team_mentions": insert_stmt.excluded.team_mentions,
+            "team_confirmations": insert_stmt.excluded.team_confirmations,
+            "updated_at": insert_stmt.excluded.updated_at,
+        },
+    )
+    session.execute(stmt)
+
+
 def _insert(table, dialect: str):
     if dialect == "postgresql":
         return pg_insert(table)
@@ -121,6 +175,16 @@ def _source_from_row(row: Any) -> NewsSource:
         mentions=row["mentions"],
         confirmations=row["confirmations"],
     )
+
+
+def _team_reliability_from_rows(rows: list[Any]) -> dict[tuple[str, str], dict[str, int]]:
+    return {
+        (row["source_id"], row["team"]): {
+            "team_mentions": row["team_mentions"],
+            "team_confirmations": row["team_confirmations"],
+        }
+        for row in rows
+    }
 
 
 def _aware_utc(value: datetime) -> datetime:

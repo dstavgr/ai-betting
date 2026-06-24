@@ -315,6 +315,18 @@ news_source = Table(
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=text("now()")),
 )
 
+news_source_team = Table(
+    "news_source_team",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("source_id", String(120), ForeignKey("news_source.id", ondelete="CASCADE"), nullable=False),
+    Column("team", String(180), nullable=False),
+    Column("team_mentions", Integer, nullable=False, server_default=text("0")),
+    Column("team_confirmations", Integer, nullable=False, server_default=text("0")),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=text("now()")),
+    UniqueConstraint("source_id", "team", name="uq_news_source_team"),
+)
+
 news_assessment = Table(
     "news_assessment",
     metadata,
