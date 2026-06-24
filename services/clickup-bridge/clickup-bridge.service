@@ -1,0 +1,18 @@
+[Unit]
+Description=Bet AI ClickUp Agent Bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/ai-betting/services/clickup-bridge
+EnvironmentFile=/home/ubuntu/ai-betting/.env
+ExecStart=/usr/bin/env python3.12 -m uvicorn app:app --host 127.0.0.1 --port 18090
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
