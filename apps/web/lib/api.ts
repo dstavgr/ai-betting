@@ -33,11 +33,11 @@ async function fetchJson<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-async function postJson<T>(path: string, body: unknown): Promise<T> {
+async function postJson<T>(path: string, body: unknown, customHeaders?: Record<string, string>): Promise<T> {
   const response = await fetch(`${engineUrl}${path}`, {
     method: "POST",
     cache: "no-store",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    headers: { Accept: "application/json", "Content-Type": "application/json", ...customHeaders },
     body: JSON.stringify(body),
   });
 
@@ -169,6 +169,8 @@ export async function getFixtureRecommendations(id: string | number): Promise<Re
 export async function askFixtureBetChat(
   id: string | number,
   question: string,
+  forwardedFor?: string,
 ): Promise<FixtureBetChatResponse> {
-  return postJson<FixtureBetChatResponse>(`/data/fixtures/${id}/bet-chat`, { question });
+  const headers = forwardedFor ? { "X-Forwarded-For": forwardedFor } : undefined;
+  return postJson<FixtureBetChatResponse>(`/data/fixtures/${id}/bet-chat`, { question }, headers);
 }

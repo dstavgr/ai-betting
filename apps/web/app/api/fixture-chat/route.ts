@@ -14,7 +14,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "fixtureId and question are required" }, { status: 400 });
     }
 
-    const response = await askFixtureBetChat(fixtureId, question);
+    const forwardedFor = request.headers.get("x-forwarded-for") || undefined;
+    const response = await askFixtureBetChat(fixtureId, question, forwardedFor);
     return NextResponse.json(response);
   } catch {
     return NextResponse.json({ error: "Bet AI chat is unavailable right now" }, { status: 502 });

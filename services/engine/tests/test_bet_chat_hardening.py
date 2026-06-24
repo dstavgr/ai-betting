@@ -17,6 +17,20 @@ def test_world_cup_in_registry():
     assert wc.name == "World Cup"
 
 
+def test_client_ip_extraction():
+    # Test fallback
+    req = _Req("1.2.3.4")
+    assert ratelimit.client_ip(req) == "1.2.3.4"
+    
+    # Test single forwarded
+    req.headers["x-forwarded-for"] = "5.6.7.8"
+    assert ratelimit.client_ip(req) == "5.6.7.8"
+    
+    # Test multiple forwarded
+    req.headers["x-forwarded-for"] = "9.10.11.12, 13.14.15.16"
+    assert ratelimit.client_ip(req) == "9.10.11.12"
+
+
 def test_per_client_rate_limit():
     ratelimit.reset()
     req = _Req("1.2.3.4")
