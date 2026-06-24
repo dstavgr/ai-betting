@@ -181,7 +181,7 @@ async def clickup_webhook(request: Request, background_tasks: BackgroundTasks) -
     if payload_team_id and payload_team_id != config.clickup_team_id:
         return JSONResponse({"status": "ignored", "reason": "team"})
 
-    if comment_text.startswith(REPLY_MARKER):
+    if comment_text.startswith(REPLY_MARKER) or comment_text.startswith("\\[agent-reply\\]"):
         return JSONResponse({"status": "ignored", "reason": "loop marker"})
 
     if config.clickup_bot_user_id and author_id == config.clickup_bot_user_id:
@@ -310,7 +310,7 @@ async def handle_chat_message(channel_id: str, message: dict[str, Any], config: 
     if not text:
         return
 
-    if text.startswith(REPLY_MARKER):
+    if text.startswith(REPLY_MARKER) or text.startswith("\\[agent-reply\\]"):
         return
 
     author_id = extract_chat_author_id(message)
