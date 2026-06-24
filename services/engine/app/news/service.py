@@ -9,6 +9,7 @@ from app.db.models import fixture, team
 from app.news.adapters import NewsSourceAdapter, StubAdapter
 from app.news.outcome import NEWS_OUTCOME_DISCLAIMER, build_news_adjusted_outcome
 from app.news.research import assess_team_news
+from app.news import store
 from app.news.sources import SourceRegistry
 
 
@@ -23,7 +24,7 @@ def fixture_news_assessment(
     if fixture_row is None:
         raise ValueError(f"Fixture {fixture_id} not found")
 
-    source_registry = registry or SourceRegistry()
+    source_registry = registry or store.load_registry(session)
     news_adapter = adapter or StubAdapter()
     since = _since(fixture_row.get("kickoff_at"))
     home_team = fixture_row.get("home_team") or "Home"
@@ -39,6 +40,7 @@ def fixture_news_assessment(
         away_bundle,
         source_registry,
     )
+    store.persist_registry(session, source_registry)
 
     return {
         "home_bundle": home_bundle.model_dump(mode="json"),

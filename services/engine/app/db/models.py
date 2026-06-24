@@ -301,6 +301,31 @@ provider_quota_window = Table(
     UniqueConstraint("provider", "window_start", name="uq_provider_quota_window"),
 )
 
+news_source = Table(
+    "news_source",
+    metadata,
+    Column("id", String(120), primary_key=True),
+    Column("name", String(220)),
+    Column("domain", String(220), nullable=False, unique=True),
+    Column("tier", String(80), nullable=False),
+    Column("reliability_score", Float, nullable=False),
+    Column("mentions", Integer, nullable=False, server_default=text("0")),
+    Column("confirmations", Integer, nullable=False, server_default=text("0")),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=text("now()")),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=text("now()")),
+)
+
+news_assessment = Table(
+    "news_assessment",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("fixture_id", Integer, nullable=False),
+    Column("team", String(180), nullable=False),
+    Column("payload", JSON, nullable=False),
+    Column("generated_at", DateTime(timezone=True), nullable=False, server_default=text("now()")),
+    UniqueConstraint("fixture_id", "team", name="uq_news_assessment_fixture_team"),
+)
+
 odds_snapshot = Table(
     "odds_snapshot",
     metadata,
