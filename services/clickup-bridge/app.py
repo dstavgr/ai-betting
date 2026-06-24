@@ -285,6 +285,7 @@ async def call_cli_agent(agent_request: AgentRequest, config: Config) -> str:
         raise AgentFailure(f"@{agent_request.agent} timed out after {int(config.agent_timeout_seconds)} seconds.") from exc
 
     if process.returncode != 0:
+        LOG.warning("agent %s exit %s STDERR: %s", agent_request.agent, process.returncode, _stderr.decode("utf-8", "replace")[-800:])
         raise AgentFailure(f"@{agent_request.agent} exited with code {process.returncode}.")
 
     output = stdout.decode("utf-8", errors="replace").strip()
