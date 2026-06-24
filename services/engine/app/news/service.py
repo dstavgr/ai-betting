@@ -5,8 +5,11 @@ from typing import Any
 
 from sqlalchemy import select
 
+from app.config import settings
 from app.db.models import fixture, team
 from app.news.adapters import NewsSourceAdapter, StubAdapter
+from app.news.adapters_rss import RSSNewsAdapter
+from app.news.models import TeamNewsBundle
 from app.news.outcome import NEWS_OUTCOME_DISCLAIMER, build_news_adjusted_outcome
 from app.news.research import assess_team_news
 from app.news import store
@@ -25,15 +28,27 @@ def fixture_news_assessment(
         raise ValueError(f"Fixture {fixture_id} not found")
 
     source_registry = registry or store.load_registry(session)
-    news_adapter = adapter or StubAdapter()
+    news_adapter = adapter or _configured_adapter()
     since = _since(fixture_row.get("kickoff_at"))
     home_team = fixture_row.get("home_team") or "Home"
     away_team = fixture_row.get("away_team") or "Away"
 
-    home_raw = news_adapter.fetch(home_team, since)
-    away_raw = news_adapter.fetch(away_team, since)
-    home_bundle = assess_team_news(home_team, fixture_id, home_raw, source_registry)
-    away_bundle = assess_team_news(away_team, fixture_id, away_raw, source_registry)
+    home_bundle = _cached_or_assessed_bundle(
+        session,
+        fixture_id,
+        home_team,
+        since,
+        news_adapter,
+        source_registry,
+    )
+    away_bundle = _cached_or_assessed_bundle(
+        session,
+        fixture_id,
+        away_team,
+        since,
+        news_adapter,
+        source_registry,
+    )
     news_adjusted = build_news_adjusted_outcome(
         fixture_id,
         home_bundle,
@@ -48,6 +63,35 @@ def fixture_news_assessment(
         "news_adjusted": news_adjusted.model_dump(mode="json"),
         "disclaimer": NEWS_OUTCOME_DISCLAIMER,
     }
+
+
+def _configured_adapter() -> NewsSourceAdapter:
+    if settings.news_adapter.lower() == "rss":
+        return RSSNewsAdapter()
+    return StubAdapter()
+
+
+def _cached_or_assessed_bundle(
+    session,
+    fixture_id: int,
+    team_name: str,
+    since: datetime,
+    adapter: NewsSourceAdapter,
+    source_registry: SourceRegistry,
+) -> TeamNewsBundle:
+    cached = store.get_cached_assessment(
+        session,
+        fixture_id,
+        team_name,
+        max_age_minutes=settings.news_cache_ttl_minutes,
+    )
+    if cached is not None:
+        return TeamNewsBundle.model_validate(cached)
+
+    raw_articles = adapter.fetch(team_name, since)
+    bundle = assess_team_news(team_name, fixture_id, raw_articles, source_registry)
+    store.cache_assessment(session, fixture_id, team_name, bundle.model_dump(mode="json"))
+    return bundle
 
 
 def _fixture_teams(session, fixture_id: int) -> dict[str, Any] | None:

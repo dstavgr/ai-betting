@@ -2,8 +2,13 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import UTC, datetime
+from typing import Any
+
+from sqlalchemy import or_, select
 
 from app.config import settings
+from app.db.models import fixture
 from app.db.session import SessionLocal
 from app.features import build_fixture_snapshot, build_season_snapshots
 from app.ingestion.api_football import ApiFootballClient
@@ -12,6 +17,8 @@ from app.ingestion.oddspapi import OddspapiClient
 from app.ingestion.oddspapi_ingest import OddspapiIngestor
 from app.ingestion.odds_api_io import OddsApiIoClient
 from app.ingestion.odds_api_io_ingest import OddsApiIoIngestor
+from app.live import FINISHED_STATUSES
+from app.news.service import fixture_news_assessment
 
 
 def main() -> None:
@@ -57,6 +64,17 @@ def main() -> None:
     )
     build_fixture.add_argument("--fixture-id", type=int, required=True)
     build_fixture.set_defaults(func=features_build_fixture)
+
+    news = subparsers.add_parser("news")
+    news_subcommands = news.add_subparsers(dest="command", required=True)
+
+    news_warm_parser = news_subcommands.add_parser(
+        "warm",
+        help="Warm team-news assessment cache for one fixture, optionally plus upcoming fixtures.",
+    )
+    news_warm_parser.add_argument("--fixture-id", type=int, required=True)
+    news_warm_parser.add_argument("--upcoming", type=int, default=0)
+    news_warm_parser.set_defaults(func=news_warm)
 
     oddspapi = subparsers.add_parser("oddspapi")
     oddspapi_subcommands = oddspapi.add_subparsers(dest="command", required=True)
@@ -240,6 +258,36 @@ def features_build_fixture(args: argparse.Namespace) -> None:
         print(json.dumps(counts.as_dict(), indent=2, sort_keys=True))
 
 
+def news_warm(args: argparse.Namespace) -> None:
+    if args.upcoming < 0:
+        raise ValueError("--upcoming must be greater than or equal to 0.")
+
+    with SessionLocal() as session:
+        fixture_ids = [args.fixture_id]
+        fixture_ids.extend(
+            _upcoming_news_fixture_ids(
+                session,
+                limit=args.upcoming,
+                exclude_fixture_ids=set(fixture_ids),
+            )
+        )
+
+        warmed = [_warm_news_fixture(session, fixture_id) for fixture_id in fixture_ids]
+
+    print(
+        json.dumps(
+            {
+                "count": len(warmed),
+                "requested_fixture_id": args.fixture_id,
+                "upcoming_requested": args.upcoming,
+                "warmed": warmed,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+
+
 def oddspapi_status_command(_: argparse.Namespace) -> None:
     with OddspapiClient.from_settings(settings) as client:
         print(json.dumps(client.account(), indent=2, sort_keys=True))
@@ -402,6 +450,46 @@ def odds_api_io_sync_historical_mapped_odds(args: argparse.Namespace) -> None:
             max_requests=args.max_requests,
         )
         print(json.dumps(counts.as_dict(), indent=2, sort_keys=True))
+
+
+def _upcoming_news_fixture_ids(session, *, limit: int, exclude_fixture_ids: set[int]) -> list[int]:
+    if limit <= 0:
+        return []
+
+    rows = session.execute(
+        select(fixture.c.id)
+        .where(
+            fixture.c.kickoff_at >= datetime.now(UTC),
+            fixture.c.status_short.not_in(FINISHED_STATUSES),
+            fixture.c.id.not_in(exclude_fixture_ids),
+        )
+        .order_by(fixture.c.kickoff_at.asc(), fixture.c.id.asc())
+        .limit(limit)
+    ).scalars()
+    return list(rows)
+
+
+def _warm_news_fixture(session, fixture_id: int) -> dict[str, Any]:
+    assessment = fixture_news_assessment(session, fixture_id)
+
+    home_bundle = _dict_or_empty(assessment.get("home_bundle"))
+    away_bundle = _dict_or_empty(assessment.get("away_bundle"))
+    return {
+        "fixture_id": fixture_id,
+        "cached_teams": [
+            team
+            for team in (home_bundle.get("team"), away_bundle.get("team"))
+            if isinstance(team, str) and team.strip()
+        ],
+        "home_team": home_bundle.get("team"),
+        "away_team": away_bundle.get("team"),
+        "home_articles": len(home_bundle.get("articles") or []),
+        "away_articles": len(away_bundle.get("articles") or []),
+    }
+
+
+def _dict_or_empty(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
 
 
 if __name__ == "__main__":

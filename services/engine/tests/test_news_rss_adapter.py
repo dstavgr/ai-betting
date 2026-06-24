@@ -1,4 +1,5 @@
 import datetime
+import time
 import pytest
 
 from app.news.adapters_rss import RSSNewsAdapter
@@ -231,3 +232,66 @@ def test_rss_adapter_feed_exception(monkeypatch):
     articles = adapter.fetch("Arsenal", since)
 
     assert len(articles) == 0
+
+
+def test_rss_adapter_returns_completed_feeds_within_overall_timeout(monkeypatch):
+    timeouts = []
+
+    class MockResponse:
+        def __init__(self, raw_data):
+            self.raw_data = raw_data
+
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def read(self): return self.raw_data
+
+    def _mock_urlopen(req, timeout=None):
+        timeouts.append(timeout)
+        if req.full_url == "mock://slow":
+            time.sleep(0.4)
+            return MockResponse(b"slow")
+        return MockResponse(b"fast")
+
+    def _mock_parse(raw_data):
+        if raw_data == b"slow":
+            return {
+                "entries": [
+                    {
+                        "title": "Arsenal slow feed",
+                        "summary": "slow",
+                        "published_parsed": (2024, 1, 2, 12, 0, 0, 1, 2, 0),
+                        "link": "http://example.com/slow"
+                    }
+                ]
+            }
+        return {
+            "entries": [
+                {
+                    "title": "Arsenal fast feed",
+                    "summary": "fast",
+                    "published_parsed": (2024, 1, 2, 12, 0, 0, 1, 2, 0),
+                    "link": "http://example.com/fast"
+                }
+            ]
+        }
+
+    monkeypatch.setattr("urllib.request.urlopen", _mock_urlopen)
+    monkeypatch.setattr("feedparser.parse", _mock_parse)
+
+    adapter = RSSNewsAdapter(
+        [
+            {"url": "mock://slow", "source_domain": "slow.com"},
+            {"url": "mock://fast", "source_domain": "fast.com"},
+        ],
+        overall_timeout_seconds=0.05,
+    )
+
+    since = datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc)
+    started_at = time.monotonic()
+    articles = adapter.fetch("Arsenal", since)
+    elapsed = time.monotonic() - started_at
+
+    assert elapsed < 0.25
+    assert [article.url for article in articles] == ["http://example.com/fast"]
+    assert timeouts
+    assert all(timeout == 5.0 for timeout in timeouts)

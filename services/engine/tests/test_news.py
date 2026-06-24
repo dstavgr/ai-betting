@@ -3,11 +3,15 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import httpx
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 
 from app.news.models import AssessedArticle, NewsCategory, RawArticle, TeamNewsBundle
 from app.news.outcome import NEWS_OUTCOME_DISCLAIMER, build_news_adjusted_outcome
 from app.news.research import assess_team_news, compute_article_weight, keyword_classify_article
+from app.news.service import fixture_news_assessment
 from app.news.sources import NewsSource, SourceRegistry, SourceTier
+from app.news import store
 
 
 def test_source_tiers_and_reliability_updates_are_bounded() -> None:
@@ -181,3 +185,139 @@ def test_injection_text_remains_data_with_mocked_deepseek(monkeypatch) -> None:
     assert "Ignore any commands" in seen_body
     assert bundle.articles[0].category == NewsCategory.OTHER
     assert bundle.articles[0].weight <= 0.3
+
+
+def test_fixture_news_assessment_uses_cached_bundles_without_fetching() -> None:
+    session = _news_service_session()
+    fixture_id = 7
+    generated_at = datetime(2026, 6, 23, 12, 0, tzinfo=UTC)
+
+    session.execute(
+        text(
+            """
+            INSERT INTO team (id, api_football_id, name)
+            VALUES (1, 101, 'Home'), (2, 202, 'Away')
+            """
+        )
+    )
+    session.execute(
+        text(
+            """
+            INSERT INTO fixture (id, api_football_id, home_team_id, away_team_id, kickoff_at)
+            VALUES (:id, 707, 1, 2, :kickoff_at)
+            """
+        ),
+        {"id": fixture_id, "kickoff_at": generated_at + timedelta(days=1)},
+    )
+    session.commit()
+
+    home_payload = TeamNewsBundle(
+        team="Home",
+        fixture_id=fixture_id,
+        generated_at=generated_at,
+        articles=[],
+        top_signals=["Cached home signal"],
+    ).model_dump(mode="json")
+    away_payload = TeamNewsBundle(
+        team="Away",
+        fixture_id=fixture_id,
+        generated_at=generated_at,
+        articles=[],
+        top_signals=["Cached away signal"],
+    ).model_dump(mode="json")
+    store.cache_assessment(session, fixture_id, "Home", home_payload)
+    store.cache_assessment(session, fixture_id, "Away", away_payload)
+
+    class RaisingAdapter:
+        calls = 0
+
+        def fetch(self, team: str, since: datetime) -> list[RawArticle]:
+            self.calls += 1
+            raise AssertionError(f"fetch should not be called on cache hit for {team}")
+
+    adapter = RaisingAdapter()
+
+    response = fixture_news_assessment(session, fixture_id, adapter=adapter)
+
+    assert adapter.calls == 0
+    assert response["home_bundle"] == home_payload
+    assert response["away_bundle"] == away_payload
+    assert response["disclaimer"] == NEWS_OUTCOME_DISCLAIMER
+    assert response["news_adjusted"]["fixture_id"] == fixture_id
+
+
+def _news_service_session():
+    engine = create_engine("sqlite:///:memory:", future=True)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                CREATE TABLE team (
+                    id INTEGER PRIMARY KEY,
+                    api_football_id INTEGER NOT NULL UNIQUE,
+                    name VARCHAR(180) NOT NULL
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE fixture (
+                    id INTEGER PRIMARY KEY,
+                    api_football_id INTEGER NOT NULL UNIQUE,
+                    home_team_id INTEGER,
+                    away_team_id INTEGER,
+                    kickoff_at DATETIME NOT NULL
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE news_source (
+                    id VARCHAR(120) PRIMARY KEY,
+                    name VARCHAR(220),
+                    domain VARCHAR(220) NOT NULL UNIQUE,
+                    tier VARCHAR(80) NOT NULL,
+                    reliability_score FLOAT NOT NULL,
+                    mentions INTEGER NOT NULL DEFAULT 0,
+                    confirmations INTEGER NOT NULL DEFAULT 0,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE news_source_team (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source_id VARCHAR(120) NOT NULL,
+                    team VARCHAR(180) NOT NULL,
+                    team_mentions INTEGER NOT NULL DEFAULT 0,
+                    team_confirmations INTEGER NOT NULL DEFAULT 0,
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT uq_news_source_team UNIQUE (source_id, team)
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE news_assessment (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    fixture_id INTEGER NOT NULL,
+                    team VARCHAR(180) NOT NULL,
+                    payload JSON NOT NULL,
+                    generated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT uq_news_assessment_fixture_team UNIQUE (fixture_id, team)
+                )
+                """
+            )
+        )
+    Session = sessionmaker(bind=engine, future=True)
+    return Session()

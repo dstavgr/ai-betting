@@ -61,6 +61,8 @@ class Settings(BaseSettings):
     deepseek_api_key: str = Field(default="")
     deepseek_base_url: str = Field(default="https://api.deepseek.com")
     deepseek_timeout_seconds: float = Field(default=10.0)
+    news_adapter: str = Field(default="rss")
+    news_cache_ttl_minutes: int = Field(default=180)
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

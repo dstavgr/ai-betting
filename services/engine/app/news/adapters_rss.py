@@ -1,4 +1,5 @@
 import time
+from concurrent.futures import ThreadPoolExecutor, wait
 import datetime
 import calendar
 import urllib.request
@@ -32,75 +33,125 @@ DEFAULT_FEEDS = [
 class RSSNewsAdapter(NewsSourceAdapter):
     """Network-enabled RSS adapter for pulling real news articles."""
 
-    def __init__(self, feeds: Optional[List[Dict[str, str]]] = None):
+    _MAX_WORKERS = 4
+    _PER_FEED_TIMEOUT_SECONDS = 5.0
+
+    def __init__(
+        self,
+        feeds: Optional[List[Dict[str, str]]] = None,
+        overall_timeout_seconds: float = 8.0,
+    ):
         self.feeds = feeds if feeds is not None else DEFAULT_FEEDS
+        self.overall_timeout_seconds = overall_timeout_seconds
 
     def fetch(self, team: str, since: datetime.datetime) -> List[RawArticle]:
         team_lower = team.lower()
         articles: List[RawArticle] = []
         seen_urls = set()
 
-        for feed_config in self.feeds:
-            feed_url = feed_config["url"]
-            source_domain = feed_config["source_domain"]
+        if not self.feeds:
+            return articles
 
-            try:
-                req = urllib.request.Request(feed_url, headers={'User-Agent': 'Mozilla/5.0'})
-                with urllib.request.urlopen(req, timeout=10) as response:
-                    raw_data = response.read()
+        max_workers = min(len(self.feeds), self._MAX_WORKERS)
+        deadline = time.monotonic() + max(0.0, self.overall_timeout_seconds)
+        executor = ThreadPoolExecutor(max_workers=max_workers)
+        future_to_index = {
+            executor.submit(self._fetch_feed, feed_config, team_lower, since): index
+            for index, feed_config in enumerate(self.feeds)
+        }
 
-                feed_data = feedparser.parse(raw_data)
+        try:
+            timeout = max(0.0, deadline - time.monotonic())
+            done, not_done = wait(future_to_index, timeout=timeout)
 
-                # Check if it was malformed or failed
-                if feed_data.get('bozo') and getattr(feed_data.bozo_exception, 'getMessage', lambda: '')() == 'timeout':
+            feed_results: Dict[int, List[RawArticle]] = {}
+            for future in done:
+                index = future_to_index[future]
+                try:
+                    feed_results[index] = future.result()
+                except Exception:
+                    feed_results[index] = []
+
+            for index in sorted(feed_results):
+                for article in feed_results[index]:
+                    if article.url in seen_urls:
+                        continue
+                    articles.append(article)
+                    seen_urls.add(article.url)
+
+            for future in not_done:
+                future.cancel()
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
+
+        return articles
+
+    def _fetch_feed(
+        self,
+        feed_config: Dict[str, str],
+        team_lower: str,
+        since: datetime.datetime,
+    ) -> List[RawArticle]:
+        feed_url = feed_config["url"]
+        source_domain = feed_config["source_domain"]
+        articles: List[RawArticle] = []
+
+        try:
+            req = urllib.request.Request(feed_url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=self._PER_FEED_TIMEOUT_SECONDS) as response:
+                raw_data = response.read()
+
+            feed_data = feedparser.parse(raw_data)
+
+            # Check if it was malformed or failed
+            if feed_data.get('bozo') and getattr(feed_data.bozo_exception, 'getMessage', lambda: '')() == 'timeout':
+                return articles
+
+            for entry in feed_data.get("entries", []):
+                title = entry.get("title", "")
+
+                body = ""
+                if "summary" in entry:
+                    body = entry["summary"]
+                elif "content" in entry and len(entry["content"]) > 0:
+                    body = entry["content"][0].get("value", "")
+
+                if not title and not body:
                     continue
 
-                for entry in feed_data.get("entries", []):
-                    title = entry.get("title", "")
+                # Filter by team name
+                if team_lower not in title.lower() and team_lower not in body.lower():
+                    continue
 
-                    body = ""
-                    if "summary" in entry:
-                        body = entry["summary"]
-                    elif "content" in entry and len(entry["content"]) > 0:
-                        body = entry["content"][0].get("value", "")
+                # Parse date
+                published_parsed = entry.get("published_parsed")
+                if not published_parsed:
+                    continue
 
-                    if not title and not body:
-                        continue
+                try:
+                    dt = datetime.datetime.fromtimestamp(calendar.timegm(published_parsed), tz=datetime.timezone.utc)
+                except (ValueError, OverflowError, TypeError):
+                    continue
 
-                    # Filter by team name
-                    if team_lower not in title.lower() and team_lower not in body.lower():
-                        continue
+                # Filter by since
+                if dt < since:
+                    continue
 
-                    # Parse date
-                    published_parsed = entry.get("published_parsed")
-                    if not published_parsed:
-                        continue
+                url = entry.get("link")
+                if not url:
+                    continue
 
-                    try:
-                        dt = datetime.datetime.fromtimestamp(calendar.timegm(published_parsed), tz=datetime.timezone.utc)
-                    except (ValueError, OverflowError, TypeError):
-                        continue
+                article = RawArticle(
+                    source_domain=source_domain,
+                    url=url,
+                    title=title,
+                    body=body,
+                    published_at=dt,
+                )
+                articles.append(article)
 
-                    # Filter by since
-                    if dt < since:
-                        continue
-
-                    url = entry.get("link")
-                    if not url or url in seen_urls:
-                        continue
-
-                    article = RawArticle(
-                        source_domain=source_domain,
-                        url=url,
-                        title=title,
-                        body=body,
-                        published_at=dt,
-                    )
-                    articles.append(article)
-                    seen_urls.add(url)
-
-            except Exception:
-                # Skip feed if any error occurs
-                continue
+        except Exception:
+            # Skip feed if any error occurs
+            return []
 
         return articles
