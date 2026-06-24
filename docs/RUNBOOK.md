@@ -66,8 +66,10 @@ Ports: web `18083→3000`, engine `18084→8000`. DB: `pgvector/pgvector:pg16`, 
 
 ## 4. Remaining steps (worked one at a time, logged below)
 
-- [ ] **Step A — Wire RSS + assessment caching.** Add a `news_adapter` config flag; service.py: check `get_cached_assessment` → on miss, fetch via `RSSNewsAdapter` + assess + `cache_assessment`. Tests. Deploy via §1. Only then does news show real articles.
-- [ ] **Step B — Rework API-Football odds.** The stashed work (`stash@{0}`, incomplete `apply_patch`) touches `docker-compose.yml`/cron/`Makefile`. Review or re-dispatch cleanly; wire as the free 3rd odds source; deploy via §1.
+- [x] **Step A — Wire RSS + assessment caching.** DONE — deployed `514f88c` 2026-06-24. `NEWS_ADAPTER=rss` default, cache-first service.py, 8s-bounded concurrent adapter, `news warm` CLI. News now serves real classified articles (cache hit ~0.024s).
+- [ ] **Step B — Rework API-Football odds.** The stashed work (`stash@{0}`, incomplete `apply_patch`) touches `docker-compose.yml`/cron/`Makefile`. Review or re-dispatch cleanly (route to agy/Jules — Codex quota-limited til ~19:18); wire as the free 3rd odds source; deploy via §1.
+- [ ] **Step A.2 (follow-up) — feed coverage + cron.** Current RSS feeds (BBC/Guardian/Sky/ESPN) are UK/global football — good for World Cup/EPL teams, sparse for Greek Super League. Add Greek sports RSS sources. Wire `news warm --upcoming` into the host cron so the cache stays warm without user-triggered cold fetches.
 
 ### Progress log
 - 2026-06-24: Deployed `59078be` to bet.stav.gr (news pipeline infra + NewsPanel + 18-book odds + walk-forward leak fix). Migrations `…40001`,`…40002` applied. News content still StubAdapter (empty) pending Step A. API-Football odds stashed pending Step B.
+- 2026-06-24: **Step A deployed** (`514f88c`). No new migration. Pre-warmed fixture 1015 → real articles (Algeria 3 / Austria 4, classified+tiered); `/news` cache hit 0.024s. News content is LIVE for covered teams. Codex hit usage limit mid-task (G7) but had finished the logic before cutoff — verified 73 bounded tests pass. Note: RSS feeds are UK/global → Greek SL coverage sparse (see Step A.2).
