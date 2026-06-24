@@ -22,6 +22,8 @@ LOG = logging.getLogger("clickup_bridge")
 REPLY_MARKER = "[agent-reply]"
 CLICKUP_COMMENT_URL = "https://api.clickup.com/api/v2/task/{task_id}/comment"
 CLICKUP_TASK_URL = "https://api.clickup.com/api/v2/task/{task_id}"
+CLICKUP_CHAT_CHANNELS_URL = "https://api.clickup.com/api/v3/workspaces/{team_id}/chat/channels"
+CLICKUP_CHAT_MESSAGES_URL = "https://api.clickup.com/api/v3/workspaces/{team_id}/chat/channels/{channel_id}/messages"
 JULES_SESSIONS_URL = "https://jules.googleapis.com/v1alpha/sessions"
 MENTION_RE = re.compile(r"@(claude|gemini|codex|agy|jules)\b", re.IGNORECASE)
 
@@ -45,6 +47,8 @@ class Config:
     per_task_per_min: int
     global_per_min: int
     jules_api_key: str | None
+    chat_enabled: bool
+    chat_poll_interval_seconds: float
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -64,6 +68,8 @@ class Config:
             per_task_per_min=int(os.environ.get("PER_TASK_PER_MIN", "3")),
             global_per_min=int(os.environ.get("GLOBAL_PER_MIN", "20")),
             jules_api_key=os.environ.get("JULES_API_KEY") or None,
+            chat_enabled=parse_env_bool(os.environ.get("CHAT_ENABLED", "true")),
+            chat_poll_interval_seconds=float(os.environ.get("CHAT_POLL_INTERVAL_SECONDS", "15")),
         )
 
 
@@ -79,6 +85,12 @@ class AgentRequest:
     agent: str
     instruction: str
     payload_team_id: str | None
+
+
+@dataclass(frozen=True)
+class ChatBaseline:
+    message_id: str | None
+    date_ms: int | None
 
 
 class MinuteRateLimiter:
@@ -114,6 +126,34 @@ rate_limiter = MinuteRateLimiter()
 @app.get("/health")
 async def health() -> PlainTextResponse:
     return PlainTextResponse("ok\n")
+
+
+@app.on_event("startup")
+async def start_chat_poller() -> None:
+    config = Config.from_env()
+    if not config.chat_enabled:
+        LOG.info("ClickUp chat poller disabled by CHAT_ENABLED")
+        return
+    if not config.clickup_api_token:
+        LOG.warning("ClickUp chat poller disabled: missing CLICKUP_API_TOKEN")
+        return
+    if not config.clickup_team_id:
+        LOG.warning("ClickUp chat poller disabled: missing CLICKUP_TEAM_ID")
+        return
+
+    app.state.chat_poller_task = asyncio.create_task(chat_poll_loop(config))
+
+
+@app.on_event("shutdown")
+async def stop_chat_poller() -> None:
+    task = getattr(app.state, "chat_poller_task", None)
+    if task is None:
+        return
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
 
 
 @app.post("/clickup/webhook")
@@ -184,6 +224,317 @@ async def clickup_webhook(request: Request, background_tasks: BackgroundTasks) -
         config,
     )
     return JSONResponse({"status": "accepted"})
+
+
+async def chat_poll_loop(config: Config) -> None:
+    baselines: dict[str, ChatBaseline] = {}
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        await initialize_chat_baselines(client, config, baselines)
+        while True:
+            await asyncio.sleep(config.chat_poll_interval_seconds)
+            try:
+                await poll_chat_once(client, config, baselines)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                LOG.warning("ClickUp chat poll cycle failed", exc_info=True)
+
+
+async def initialize_chat_baselines(
+    client: httpx.AsyncClient,
+    config: Config,
+    baselines: dict[str, ChatBaseline],
+) -> None:
+    try:
+        channels = await list_chat_channels(client, config)
+    except Exception:
+        LOG.warning("ClickUp chat baseline initialization failed while listing channels", exc_info=True)
+        return
+
+    for channel in channels:
+        channel_id = stringify(channel.get("id")) if isinstance(channel, dict) else None
+        if not channel_id:
+            continue
+        try:
+            messages = await list_chat_messages(client, config, channel_id)
+        except Exception:
+            LOG.warning("ClickUp chat baseline initialization failed for channel %s", channel_id, exc_info=True)
+            continue
+        baselines[channel_id] = newest_chat_baseline(messages) or ChatBaseline(None, None)
+
+    LOG.info("ClickUp chat poller initialized with %s channel baselines", len(baselines))
+
+
+async def poll_chat_once(
+    client: httpx.AsyncClient,
+    config: Config,
+    baselines: dict[str, ChatBaseline],
+) -> None:
+    try:
+        channels = await list_chat_channels(client, config)
+    except Exception:
+        LOG.warning("ClickUp chat poll failed while listing channels", exc_info=True)
+        return
+
+    for channel in channels:
+        if not isinstance(channel, dict):
+            continue
+        channel_id = stringify(channel.get("id"))
+        if not channel_id:
+            continue
+
+        try:
+            messages = await list_chat_messages(client, config, channel_id)
+            previous = baselines.get(channel_id)
+            if previous is None:
+                baselines[channel_id] = newest_chat_baseline(messages) or ChatBaseline(None, None)
+                LOG.info("ClickUp chat poller initialized new channel baseline for %s", channel_id)
+                continue
+
+            new_messages = [message for message in messages if chat_message_is_newer(message, previous)]
+            newest = newest_chat_baseline(messages, previous) or previous
+
+            for message in sorted(new_messages, key=chat_message_sort_key):
+                await handle_chat_message(channel_id, message, config)
+
+            baselines[channel_id] = newest
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            LOG.warning("ClickUp chat poll failed for channel %s", channel_id, exc_info=True)
+
+
+async def handle_chat_message(channel_id: str, message: dict[str, Any], config: Config) -> None:
+    text = extract_chat_message_text(message)
+    if not text:
+        return
+
+    if text.startswith(REPLY_MARKER):
+        return
+
+    author_id = extract_chat_author_id(message)
+    if config.clickup_bot_user_id and author_id == config.clickup_bot_user_id:
+        return
+
+    mention = parse_first_mention(text, config.max_instruction_chars)
+    if mention is None:
+        return
+
+    send_field = chat_send_field_for_message(message)
+    if not await rate_limiter.allow(channel_id, config.per_task_per_min, config.global_per_min):
+        await post_clickup_chat_message(
+            channel_id,
+            mention.agent,
+            "Rate limited. Please wait before asking another agent from this channel.",
+            config,
+            send_field,
+        )
+        return
+
+    if not mention.instruction:
+        await post_clickup_chat_message(
+            channel_id,
+            mention.agent,
+            "No instruction was provided after the agent mention.",
+            config,
+            send_field,
+        )
+        return
+
+    await process_chat_agent_request(
+        AgentRequest(
+            task_id=channel_id,
+            agent=mention.agent,
+            instruction=mention.instruction,
+            payload_team_id=config.clickup_team_id,
+        ),
+        config,
+        send_field,
+    )
+
+
+async def process_chat_agent_request(
+    agent_request: AgentRequest,
+    config: Config,
+    send_field: str,
+) -> None:
+    try:
+        if agent_request.agent == "jules":
+            output = await call_jules(agent_request, config)
+        else:
+            output = await call_cli_agent(agent_request, config)
+    except AgentFailure as exc:
+        output = str(exc)
+    except Exception:
+        LOG.exception("Unexpected agent failure for ClickUp chat channel %s", agent_request.task_id)
+        output = "Agent failed unexpectedly. Check the bridge logs for details."
+
+    await post_clickup_chat_message(agent_request.task_id, agent_request.agent, output, config, send_field)
+
+
+async def list_chat_channels(client: httpx.AsyncClient, config: Config) -> list[dict[str, Any]]:
+    response = await client.get(
+        CLICKUP_CHAT_CHANNELS_URL.format(team_id=config.clickup_team_id),
+        headers={"Authorization": config.clickup_api_token},
+    )
+    if response.status_code >= 400:
+        raise RuntimeError(f"ClickUp chat channel list failed with status {response.status_code}")
+
+    data = response.json()
+    channels = data.get("data")
+    if not isinstance(channels, list):
+        LOG.warning("ClickUp chat channel list response did not include a data array")
+        return []
+    return [channel for channel in channels if isinstance(channel, dict)]
+
+
+async def list_chat_messages(
+    client: httpx.AsyncClient,
+    config: Config,
+    channel_id: str,
+) -> list[dict[str, Any]]:
+    response = await client.get(
+        CLICKUP_CHAT_MESSAGES_URL.format(team_id=config.clickup_team_id, channel_id=channel_id),
+        headers={"Authorization": config.clickup_api_token},
+    )
+    if response.status_code >= 400:
+        raise RuntimeError(f"ClickUp chat message list failed with status {response.status_code}")
+
+    data = response.json()
+    messages = data.get("data")
+    if not isinstance(messages, list):
+        LOG.warning("ClickUp chat message list response for channel %s did not include a data array", channel_id)
+        return []
+    return [message for message in messages if isinstance(message, dict)]
+
+
+async def post_clickup_chat_message(
+    channel_id: str,
+    agent: str,
+    output: str,
+    config: Config,
+    send_field: str,
+) -> None:
+    if not config.clickup_api_token:
+        LOG.warning("Cannot post ClickUp chat reply without CLICKUP_API_TOKEN")
+        return
+
+    reply_text = f"{REPLY_MARKER} @{agent}:\n{truncate_output(output, config.max_output_chars)}"
+    fields_to_try = [send_field]
+    alternate = "text_content" if send_field == "content" else "content"
+    if alternate not in fields_to_try:
+        fields_to_try.append(alternate)
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        for field in fields_to_try:
+            response = await client.post(
+                CLICKUP_CHAT_MESSAGES_URL.format(team_id=config.clickup_team_id, channel_id=channel_id),
+                headers={"Authorization": config.clickup_api_token},
+                json={field: reply_text},
+            )
+            if response.status_code < 400:
+                return
+            LOG.warning(
+                "ClickUp chat reply post failed for channel %s using %s with status %s",
+                channel_id,
+                field,
+                response.status_code,
+            )
+
+
+def newest_chat_baseline(
+    messages: list[dict[str, Any]],
+    current: ChatBaseline | None = None,
+) -> ChatBaseline | None:
+    newest = current
+    for message in messages:
+        baseline = chat_baseline_from_message(message)
+        if baseline is None:
+            continue
+        if newest is None or chat_baseline_is_newer(baseline, newest):
+            newest = baseline
+    return newest
+
+
+def chat_baseline_from_message(message: dict[str, Any]) -> ChatBaseline | None:
+    message_id = stringify(message.get("id"))
+    date_ms = parse_int(message.get("date"))
+    if message_id is None and date_ms is None:
+        return None
+    return ChatBaseline(message_id=message_id, date_ms=date_ms)
+
+
+def chat_message_is_newer(message: dict[str, Any], baseline: ChatBaseline) -> bool:
+    candidate = chat_baseline_from_message(message)
+    if candidate is None:
+        return False
+    return chat_baseline_is_newer(candidate, baseline)
+
+
+def chat_baseline_is_newer(candidate: ChatBaseline, baseline: ChatBaseline) -> bool:
+    candidate_id = parse_int(candidate.message_id)
+    baseline_id = parse_int(baseline.message_id)
+    if candidate_id is not None and baseline_id is not None:
+        return candidate_id > baseline_id
+
+    if candidate.date_ms is not None and baseline.date_ms is not None and candidate.date_ms != baseline.date_ms:
+        return candidate.date_ms > baseline.date_ms
+
+    if candidate.message_id is not None and baseline.message_id is not None:
+        return candidate.message_id > baseline.message_id
+
+    if candidate.date_ms is not None and baseline.date_ms is not None:
+        return candidate.date_ms > baseline.date_ms
+
+    return candidate.message_id is not None and baseline.message_id is None
+
+
+def chat_message_sort_key(message: dict[str, Any]) -> tuple[int, int, str]:
+    message_id = stringify(message.get("id"))
+    parsed_id = parse_int(message_id)
+    return (
+        parsed_id if parsed_id is not None else -1,
+        parse_int(message.get("date")) or 0,
+        message_id or "",
+    )
+
+
+def extract_chat_message_text(message: dict[str, Any]) -> str | None:
+    value = first_path(
+        message,
+        (
+            ("text_content",),
+            ("content",),
+        ),
+    )
+    return normalize_comment_text(value)
+
+
+def extract_chat_author_id(message: dict[str, Any]) -> str | None:
+    value = first_path(
+        message,
+        (
+            ("user_id",),
+            ("author_id",),
+            ("sender_id",),
+            ("user", "id"),
+            ("author", "id"),
+            ("sender", "id"),
+            ("creator", "id"),
+            ("created_by",),
+            ("created_by", "id"),
+        ),
+    )
+    return stringify(value)
+
+
+def chat_send_field_for_message(message: dict[str, Any]) -> str:
+    if "content" in message:
+        return "content"
+    if "text_content" in message:
+        return "text_content"
+    return "content"
 
 
 def verify_clickup_signature(body: bytes, signature: str | None, config: Config) -> None:
@@ -498,6 +849,17 @@ def stringify(value: Any) -> str | None:
     if value is None:
         return None
     return str(value)
+
+
+def parse_int(value: Any) -> int | None:
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_env_bool(value: str) -> bool:
+    return value.strip().lower() not in {"0", "false", "no", "off"}
 
 
 class AgentFailure(Exception):
