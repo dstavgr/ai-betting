@@ -19,7 +19,14 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 
 LOG = logging.getLogger("clickup_bridge")
 
-REPLY_MARKER = "[agent-reply]"
+REPLY_MARKER = "agent-reply::"
+
+
+def is_bot_reply(text):
+    # SECURITY/loop-prevention: ClickUp escapes markdown brackets (e.g. [..] -> \[..\]),
+    # so match the bracket-free token after stripping backslashes. Without this the
+    # chat poller would answer its own replies forever (denial-of-wallet loop).
+    return "agent-reply" in (text or "").replace(chr(92), "").lower()
 CLICKUP_COMMENT_URL = "https://api.clickup.com/api/v2/task/{task_id}/comment"
 CLICKUP_TASK_URL = "https://api.clickup.com/api/v2/task/{task_id}"
 CLICKUP_CHAT_CHANNELS_URL = "https://api.clickup.com/api/v3/workspaces/{team_id}/chat/channels"
@@ -181,7 +188,7 @@ async def clickup_webhook(request: Request, background_tasks: BackgroundTasks) -
     if payload_team_id and payload_team_id != config.clickup_team_id:
         return JSONResponse({"status": "ignored", "reason": "team"})
 
-    if comment_text.startswith(REPLY_MARKER):
+    if is_bot_reply(comment_text):
         return JSONResponse({"status": "ignored", "reason": "loop marker"})
 
     if config.clickup_bot_user_id and author_id == config.clickup_bot_user_id:
@@ -310,7 +317,7 @@ async def handle_chat_message(channel_id: str, message: dict[str, Any], config: 
     if not text:
         return
 
-    if text.startswith(REPLY_MARKER):
+    if is_bot_reply(text):
         return
 
     author_id = extract_chat_author_id(message)
