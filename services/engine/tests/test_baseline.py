@@ -1,10 +1,15 @@
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+
+from app.db.models import fixture
 from app.modeling.baseline import (
     SelectedPrice,
     average_no_vig_market_probabilities,
     blend_probabilities,
     estimate_1x2_probabilities,
+    finished_fixture_matches,
     is_price_fresh,
 )
 
@@ -59,3 +64,96 @@ def test_blend_probabilities_shrinks_toward_market() -> None:
 
     assert round(sum(blended.values()), 6) == 1.0
     assert 0.45 < blended["home_win"] < 0.70
+
+
+def test_finished_fixture_matches_filters_strictly_before_kickoff() -> None:
+    session = _baseline_session()
+    league_id = 10
+    other_league_id = 20
+    first_kickoff = datetime(2026, 5, 1, 16, 0, tzinfo=UTC)
+    cutoff = first_kickoff + timedelta(days=7)
+    later_cutoff = cutoff + timedelta(days=7)
+
+    session.execute(
+        fixture.insert(),
+        [
+            _fixture_row(1, league_id, 101, 102, first_kickoff, 2, 0),
+            _fixture_row(2, league_id, 103, 104, cutoff, 1, 1),
+            _fixture_row(3, league_id, 105, 106, later_cutoff, 0, 1),
+            _fixture_row(4, other_league_id, 107, 108, first_kickoff, 3, 2),
+            _fixture_row(5, league_id, 109, 110, first_kickoff - timedelta(days=7), None, 1),
+            _fixture_row(6, league_id, 111, 112, first_kickoff - timedelta(days=7), 1, 0, status="NS"),
+        ],
+    )
+    session.commit()
+
+    early_matches = finished_fixture_matches(session, league_id, kickoff_before=cutoff)
+    later_matches = finished_fixture_matches(session, league_id, kickoff_before=later_cutoff)
+    unbounded_matches = finished_fixture_matches(session, league_id)
+
+    early_kickoffs = [_as_utc(match[4]) for match in early_matches]
+    later_kickoffs = [_as_utc(match[4]) for match in later_matches]
+    unbounded_kickoffs = [_as_utc(match[4]) for match in unbounded_matches]
+
+    assert early_kickoffs == [first_kickoff]
+    assert later_kickoffs == [first_kickoff, cutoff]
+    assert unbounded_kickoffs == [first_kickoff, cutoff, later_cutoff]
+    assert len(early_matches) < len(later_matches) < len(unbounded_matches)
+    assert all(kickoff < cutoff for kickoff in early_kickoffs)
+    assert all(kickoff < later_cutoff for kickoff in later_kickoffs)
+
+
+def _baseline_session():
+    engine = create_engine("sqlite:///:memory:", future=True)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                CREATE TABLE fixture (
+                    id INTEGER PRIMARY KEY,
+                    api_football_id INTEGER NOT NULL UNIQUE,
+                    league_id INTEGER,
+                    home_team_id INTEGER,
+                    away_team_id INTEGER,
+                    kickoff_at DATETIME NOT NULL,
+                    status_short VARCHAR(40),
+                    goals_home INTEGER,
+                    goals_away INTEGER,
+                    updated_at DATETIME
+                )
+                """
+            )
+        )
+    Session = sessionmaker(bind=engine, future=True)
+    return Session()
+
+
+def _fixture_row(
+    fixture_id: int,
+    league_id: int,
+    home_team_id: int,
+    away_team_id: int,
+    kickoff_at: datetime,
+    goals_home: int | None,
+    goals_away: int | None,
+    *,
+    status: str = "FT",
+) -> dict[str, object]:
+    return {
+        "id": fixture_id,
+        "api_football_id": 1000 + fixture_id,
+        "league_id": league_id,
+        "home_team_id": home_team_id,
+        "away_team_id": away_team_id,
+        "kickoff_at": kickoff_at,
+        "status_short": status,
+        "goals_home": goals_home,
+        "goals_away": goals_away,
+        "updated_at": kickoff_at + timedelta(hours=2),
+    }
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)

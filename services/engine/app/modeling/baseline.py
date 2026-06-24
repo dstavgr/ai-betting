@@ -157,7 +157,7 @@ def evaluate_baseline(session: Session) -> dict[str, Any]:
     brier_total = 0.0
     log_loss_total = 0.0
     bucket_totals: dict[str, dict[str, float]] = {}
-    model_cache: DixonColesCache = {}
+    wf_model_cache: dict[tuple[int | None, datetime], DixonColesModel] = {}
 
     for fixture_id in eligible_fixture_ids(session, limit=500):
         snapshot = feature_snapshot_row(session, fixture_id)
@@ -171,11 +171,19 @@ def evaluate_baseline(session: Session) -> dict[str, Any]:
         context = fixture_context(session, fixture_id)
         if context is None:
             continue
+            
+        key = (context.league_id, context.kickoff_at)
+        if key not in wf_model_cache:
+            matches = finished_fixture_matches(session, context.league_id, kickoff_before=context.kickoff_at)
+            wf_model_cache[key] = fit_dixon_coles(matches, xi=DIXON_COLES_XI)
+        
+        local_model_cache = {context.league_id: wf_model_cache[key]}
+
         probabilities = calibrated_probabilities_for_fixture(
             session,
             context,
             snapshot,
-            model_cache=model_cache,
+            model_cache=local_model_cache,
         )
         true_probability = max(probabilities[str(target_result)], 1e-9)
         brier_total += sum(
@@ -223,7 +231,7 @@ def backtest_baseline(session: Session, *, limit: int = 1000) -> dict[str, Any]:
     no_bet_reasons: dict[str, int] = {}
     ev_buckets: dict[str, dict[str, float]] = {}
     latest_bets: list[dict[str, Any]] = []
-    model_cache: DixonColesCache = {}
+    wf_model_cache: dict[tuple[int | None, datetime], DixonColesModel] = {}
 
     for fixture_id in eligible_fixture_ids(session, limit=limit):
         fixtures_seen += 1
@@ -235,11 +243,22 @@ def backtest_baseline(session: Session, *, limit: int = 1000) -> dict[str, Any]:
         target_result = target.get("result")
         if target.get("available") is not True or target_result not in TARGET_OUTCOME_IDS:
             continue
+            
+        context = fixture_context(session, fixture_id)
+        if context is None:
+            continue
+
+        key = (context.league_id, context.kickoff_at)
+        if key not in wf_model_cache:
+            matches = finished_fixture_matches(session, context.league_id, kickoff_before=context.kickoff_at)
+            wf_model_cache[key] = fit_dixon_coles(matches, xi=DIXON_COLES_XI)
+        
+        local_model_cache = {context.league_id: wf_model_cache[key]}
 
         recommendations = baseline_recommendations_for_fixture(
             session,
             fixture_id,
-            model_cache=model_cache,
+            model_cache=local_model_cache,
         )
         if not recommendations:
             continue
@@ -425,7 +444,12 @@ def finished_fixture_signature(
 def finished_fixture_matches(
     session: Session,
     league_id: int | None,
+    kickoff_before: datetime | None = None,
 ) -> list[tuple[int, int, int, int, datetime]]:
+    conditions = list(finished_fixture_conditions(league_id))
+    if kickoff_before is not None:
+        conditions.append(fixture.c.kickoff_at < kickoff_before)
+    
     rows = session.execute(
         select(
             fixture.c.home_team_id,
@@ -434,7 +458,7 @@ def finished_fixture_matches(
             fixture.c.goals_away,
             fixture.c.kickoff_at,
         )
-        .where(*finished_fixture_conditions(league_id))
+        .where(*conditions)
         .order_by(fixture.c.kickoff_at, fixture.c.id)
     ).mappings()
     return [
