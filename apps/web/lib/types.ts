@@ -309,3 +309,53 @@ export type Standing = {
   goalDiff: number;
   points: number;
 };
+
+export type NewsArticle = {
+  team: string;
+  url: string;
+  title: string;
+  summary: string;
+  category: string;
+  source_tier: string;
+  source_weight: number;
+  weight: number;
+  flagged: boolean;
+  published_at: string;
+};
+
+export type NewsBundle = {
+  team: string;
+  fixture_id: number;
+  generated_at: string;
+  top_signals: string[];
+  articles: NewsArticle[];
+};
+
+export type NewsAdjustment = {
+  signal: string;
+  weight: number;
+  rationale: string;
+};
+
+export type NewsAdjusted = {
+  fixture_id: number;
+  suggested_direction: "LEAN_HOME" | "LEAN_DRAW" | "LEAN_AWAY" | "NEUTRAL";
+  confidence: number;
+  adjustments: NewsAdjustment[];
+  per_team_summary: Record<
+    string,
+    {
+      role: "home" | "away";
+      news_score: number;
+      top_signals: string[];
+    }
+  >;
+  disclaimer: string;
+};
+
+export type FixtureNews = {
+  home_bundle: NewsBundle | null;
+  away_bundle: NewsBundle | null;
+  news_adjusted: NewsAdjusted | null;
+  disclaimer: string;
+};

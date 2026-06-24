@@ -12,11 +12,13 @@ import { TeamCrest } from "@/components/TeamCrest";
 import { WinProbabilityBar } from "@/components/WinProbabilityBar";
 import { FormGuide } from "@/components/widgets/FormGuide";
 import { HeadToHead } from "@/components/widgets/HeadToHead";
+import { NewsPanel } from "@/components/NewsPanel";
 import { MatchFacts } from "@/components/widgets/MatchFacts";
 import { SectionCard } from "@/components/ui/section-card";
 import {
   getFixture,
   getFixtureMarkets,
+  getFixtureNews,
   getFixtureOpportunity,
   getFixtureRecommendations,
   getSeasonFixtures,
@@ -30,13 +32,14 @@ export const dynamic = "force-dynamic";
 
 export default async function MatchPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [fixture, opportunity, recommendations, teams, seasonFixtures, markets] = await Promise.all([
+  const [fixture, opportunity, recommendations, teams, seasonFixtures, markets, news] = await Promise.all([
     getFixture(id),
     getFixtureOpportunity(id),
     getFixtureRecommendations(id),
     getTeams(),
     getSeasonFixtures(),
     getFixtureMarkets(id),
+    getFixtureNews(id),
   ]);
 
   if (!fixture) {
@@ -159,7 +162,10 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
-      <ChatPanel fixtureId={fixture.id} fixtureLabel={`${home} vs ${away}`} />
+      <div className="space-y-4 lg:sticky lg:top-24">
+        <NewsPanel fixtureId={fixture.id} initialNews={news} />
+        <ChatPanel fixtureId={fixture.id} fixtureLabel={`${home} vs ${away}`} />
+      </div>
     </div>
   );
 }

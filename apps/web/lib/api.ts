@@ -12,6 +12,7 @@ import type {
   Recommendation,
   ResearchSummary,
   Team,
+  FixtureNews,
 } from "./types";
 
 const engineUrl = process.env.ENGINE_URL ?? "http://127.0.0.1:8000";
@@ -153,6 +154,14 @@ export async function getFixtureOdds(id: string | number): Promise<FixtureOdds |
 export async function getFixtureMarkets(id: string | number): Promise<FixtureMarkets | null> {
   try {
     return await fetchJson<FixtureMarkets>("/data/fixtures/" + id + "/markets");
+  } catch {
+    return null;
+  }
+}
+
+export async function getFixtureNews(id: string | number): Promise<FixtureNews | null> {
+  try {
+    return await fetchJson<FixtureNews>("/data/fixtures/" + id + "/news");
   } catch {
     return null;
   }
