@@ -802,14 +802,10 @@ def normalize_price_rows(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
             if not isinstance(market_payload, Mapping):
                 continue
             outcomes = market_payload.get("outcomes")
-            if not isinstance(outcomes, Mapping):
-                continue
-            for outcome_id, outcome_payload in outcomes.items():
+            for outcome_id, outcome_payload in outcome_entries(outcomes):
                 if not isinstance(outcome_payload, Mapping):
                     continue
-                players = outcome_payload.get("players")
-                player_entries = players.items() if isinstance(players, Mapping) else [("0", outcome_payload)]
-                for player_key, player_payload in player_entries:
+                for player_key, player_payload in current_player_entries(outcome_payload):
                     if not isinstance(player_payload, Mapping):
                         continue
                     price_decimal = first_float(player_payload, "price", "priceDecimal", "decimal")
@@ -826,7 +822,10 @@ def normalize_price_rows(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
                             "bookmaker_outcome_id": bookmaker_outcome_id,
                             "player_key": str(player_key),
                             "player_name": first_str(player_payload, "playerName", "player_name"),
-                            "line": first_float(player_payload, "line", "handicap") or line_from_outcome(bookmaker_outcome_id),
+                            "line": first_not_none(
+                                first_float(player_payload, "line", "handicap"),
+                                line_from_outcome(bookmaker_outcome_id),
+                            ),
                             "price_decimal": price_decimal,
                             "price_american": first_str(player_payload, "priceAmerican", "price_american"),
                             "price_fractional": first_str(player_payload, "priceFractional", "price_fractional"),
@@ -855,20 +854,10 @@ def normalize_historical_price_rows(payload: Mapping[str, Any]) -> list[dict[str
             if not isinstance(market_payload, Mapping):
                 continue
             outcomes = market_payload.get("outcomes")
-            if not isinstance(outcomes, Mapping):
-                continue
-            for outcome_id, outcome_payload in outcomes.items():
+            for outcome_id, outcome_payload in outcome_entries(outcomes):
                 if not isinstance(outcome_payload, Mapping):
                     continue
-                players = outcome_payload.get("players")
-                if isinstance(players, Mapping):
-                    player_entries = players.items()
-                elif isinstance(players, list):
-                    player_entries = [("0", players)]
-                else:
-                    player_entries = [("0", outcome_payload)]
-
-                for player_key, player_payload in player_entries:
+                for player_key, player_payload in historical_player_entries(outcome_payload):
                     for entry in historical_entries(player_payload):
                         contexts = [entry]
                         if isinstance(player_payload, Mapping):
@@ -888,7 +877,10 @@ def normalize_historical_price_rows(payload: Mapping[str, Any]) -> list[dict[str
                                 "bookmaker_outcome_id": bookmaker_outcome_id,
                                 "player_key": str(player_key),
                                 "player_name": first_str_from(contexts, "playerName", "player_name"),
-                                "line": first_float_from(contexts, "line", "handicap") or line_from_outcome(bookmaker_outcome_id),
+                                "line": first_not_none(
+                                    first_float_from(contexts, "line", "handicap"),
+                                    line_from_outcome(bookmaker_outcome_id),
+                                ),
                                 "price_decimal": price_decimal,
                                 "price_american": first_str_from(contexts, "priceAmerican", "price_american"),
                                 "price_fractional": first_str_from(contexts, "priceFractional", "price_fractional"),
@@ -935,7 +927,96 @@ def markets_for_bookmaker(bookmaker_payload: Any) -> Mapping[str, Any]:
     if not isinstance(bookmaker_payload, Mapping):
         return {}
     value = bookmaker_payload.get("markets") or {}
-    return value if isinstance(value, Mapping) else {}
+    if isinstance(value, Mapping):
+        return value
+    if isinstance(value, list):
+        markets: dict[str, Any] = {}
+        for index, market_payload in enumerate(value):
+            if not isinstance(market_payload, Mapping):
+                continue
+            market_id = first_str(
+                market_payload, "marketId", "market_id", "id", "key", "bookmakerMarketId"
+            ) or str(index)
+            markets[str(market_id)] = market_payload
+        return markets
+    return {}
+
+
+def outcome_entries(outcomes: Any) -> Iterable[tuple[str, Mapping[str, Any]]]:
+    if isinstance(outcomes, Mapping):
+        for outcome_id, outcome_payload in outcomes.items():
+            if isinstance(outcome_payload, Mapping):
+                yield str(outcome_id), outcome_payload
+        return
+
+    if isinstance(outcomes, list):
+        for index, outcome_payload in enumerate(outcomes):
+            if not isinstance(outcome_payload, Mapping):
+                continue
+            outcome_id = first_str(
+                outcome_payload, "outcomeId", "outcome_id", "id", "key", "bookmakerOutcomeId"
+            ) or str(index)
+            yield str(outcome_id), outcome_payload
+
+
+def current_player_entries(outcome_payload: Mapping[str, Any]) -> Iterable[tuple[str, Mapping[str, Any]]]:
+    players = outcome_payload.get("players")
+    if isinstance(players, Mapping):
+        for player_key, player_payload in players.items():
+            if isinstance(player_payload, Mapping):
+                yield str(player_key), player_payload
+        return
+
+    if isinstance(players, list):
+        for index, player_payload in enumerate(players):
+            if not isinstance(player_payload, Mapping):
+                continue
+            player_key = first_str(
+                player_payload, "playerId", "player_id", "id", "key"
+            ) or str(index)
+            yield str(player_key), player_payload
+        return
+
+    yield "0", outcome_payload
+
+
+def historical_player_entries(outcome_payload: Mapping[str, Any]) -> Iterable[tuple[str, Any]]:
+    players = outcome_payload.get("players")
+    if isinstance(players, Mapping):
+        yield from players.items()
+        return
+
+    if isinstance(players, list):
+        has_player_wrappers = any(
+            isinstance(player_payload, Mapping)
+            and any(
+                key in player_payload
+                for key in (
+                    "playerId",
+                    "player_id",
+                    "playerName",
+                    "player_name",
+                    "history",
+                    "odds",
+                    "prices",
+                    "entries",
+                )
+            )
+            for player_payload in players
+        )
+        if has_player_wrappers:
+            for index, player_payload in enumerate(players):
+                if not isinstance(player_payload, Mapping):
+                    continue
+                player_key = first_str(
+                    player_payload, "playerId", "player_id", "id", "key"
+                ) or str(index)
+                yield str(player_key), player_payload
+        else:
+            yield "0", players
+        return
+
+    yield "0", outcome_payload
 
 
 def parse_datetime(value: str | None) -> datetime | None:
@@ -998,6 +1079,13 @@ def first_float(payload: Mapping[str, Any], *keys: str) -> float | None:
 def first_float_from(payloads: Iterable[Mapping[str, Any]], *keys: str) -> float | None:
     for payload in payloads:
         value = first_float(payload, *keys)
+        if value is not None:
+            return value
+    return None
+
+
+def first_not_none(*values: Any) -> Any:
+    for value in values:
         if value is not None:
             return value
     return None

@@ -555,6 +555,42 @@ def normalize_generic_price_rows(
     market_label = market_name or "Market"
     market_id = provider_market_id(market_label)
 
+    for outcome_key, outcome_payload in nested_outcome_entries(odds_row):
+        price_decimal = first_float(outcome_payload, "price", "decimal", "odds", "value")
+        if price_decimal is None:
+            continue
+        outcome_name = first_str(
+            outcome_payload, "name", "label", "outcome", "selection"
+        ) or humanize_provider_key(outcome_key)
+        line = line_from_context(outcome_payload, outcome_key)
+        if line is None:
+            line = line_from_context(odds_row, outcome_key)
+        rows.append(
+            price_row(
+                outcome_payload,
+                bookmaker_slug=bookmaker_slug,
+                bookmaker_name=bookmaker_name,
+                market_id=market_id,
+                market_name=market_label,
+                outcome_id=provider_outcome_id(outcome_key),
+                outcome_name=outcome_name,
+                bookmaker_outcome_id=first_str(
+                    outcome_payload, "id", "key", "bookmakerOutcomeId"
+                )
+                or outcome_key,
+                price_decimal=price_decimal,
+                provider_event_id=provider_event_id,
+                provider_market_name=market_name,
+                provider_outcome=outcome_key,
+                line=line,
+                price_american=first_str(
+                    outcome_payload, "american", "priceAmerican"
+                )
+                or first_str(odds_row, f"{outcome_key}American"),
+                updated_at=updated_at,
+            )
+        )
+
     if single_outcome and single_price is not None:
         rows.append(
             price_row(
@@ -608,6 +644,34 @@ def normalize_generic_price_rows(
             )
         )
     return rows
+
+
+def nested_outcome_entries(payload: Mapping[str, Any]) -> Iterable[tuple[str, Mapping[str, Any]]]:
+    for container_key in ("outcomes", "selections", "runners", "prices"):
+        container = payload.get(container_key)
+        if isinstance(container, Mapping):
+            for key, value in container.items():
+                if isinstance(value, Mapping):
+                    yield str(key), value
+                elif value is not None and not isinstance(value, bool):
+                    yield str(key), {"price": value}
+            continue
+
+        if isinstance(container, list):
+            for index, value in enumerate(container):
+                if not isinstance(value, Mapping):
+                    continue
+                key = first_str(
+                    value,
+                    "id",
+                    "key",
+                    "bookmakerOutcomeId",
+                    "name",
+                    "label",
+                    "outcome",
+                    "selection",
+                ) or str(index)
+                yield str(key), value
 
 
 def price_row(
@@ -680,6 +744,10 @@ GENERIC_OUTCOME_SKIP_KEYS = {
     "odds",
     "american",
     "priceamerican",
+    "outcomes",
+    "selections",
+    "runners",
+    "prices",
 }
 
 

@@ -6,6 +6,30 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.leagues import DEFAULT_LEAGUE_KEY, default_league
 
 
+ODDS_API_IO_DEFAULT_BOOKMAKERS = ",".join(
+    [
+        "Bet365",
+        "Betfair Exchange",
+        "888Sport",
+        "Betano",
+        "Novibet",
+        "Stoiximan",
+        "Unibet",
+        "William Hill",
+        "Marathonbet",
+        "Betsson",
+        "Betway",
+        "Interwetten",
+        "BetMGM",
+        "DraftKings",
+        "FanDuel",
+        "Coolbet",
+        "Betclic FR",
+        "Bwin IT",
+    ]
+)
+
+
 class Settings(BaseSettings):
     database_url: str = Field(default="postgresql+psycopg://app:app@db:5432/betting")
     allowed_origins: str = Field(default="https://bet.stav.gr,http://localhost:3000,http://127.0.0.1:18083")
@@ -20,13 +44,13 @@ class Settings(BaseSettings):
     oddspapi_timeout_seconds: float = Field(default=20.0)
     oddspapi_default_sport_id: int | None = Field(default=None)
     oddspapi_default_tournament_id: str | None = Field(default=None)
-    oddspapi_default_bookmakers: str = Field(default="pinnacle")
+    oddspapi_default_bookmakers: str = Field(default="pinnacle,bet365")
     odds_api_io_key: str = Field(default="")
     odds_api_io_base_url: str = Field(default="https://api.odds-api.io/v3")
     odds_api_io_timeout_seconds: float = Field(default=20.0)
     odds_api_io_requests_per_hour: int = Field(default=100)
     odds_api_io_default_sport: str = Field(default="football")
-    odds_api_io_default_bookmakers: str = Field(default="Novibet,Stoiximan")
+    odds_api_io_default_bookmakers: str = Field(default=ODDS_API_IO_DEFAULT_BOOKMAKERS)
     odds_api_io_default_league: str | None = Field(default=None)
     odds_api_io_event_ttl_seconds: int = Field(default=600)
     odds_api_io_odds_ttl_seconds: int = Field(default=900)

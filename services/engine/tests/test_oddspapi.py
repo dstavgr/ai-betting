@@ -1,6 +1,7 @@
 import httpx
 import pytest
 
+from app.config import Settings
 from app.ingestion.oddspapi import OddspapiClient, OddspapiError, clean_params
 from app.ingestion.oddspapi_ingest import (
     iter_fixture_payloads,
@@ -8,6 +9,14 @@ from app.ingestion.oddspapi_ingest import (
     normalize_historical_price_rows,
     normalize_price_rows,
 )
+
+
+def test_oddspapi_default_bookmakers_keep_pinnacle_and_bet365(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ODDSPAPI_DEFAULT_BOOKMAKERS", raising=False)
+
+    config = Settings(_env_file=None)
+
+    assert config.oddspapi_default_bookmakers == "pinnacle,bet365"
 
 
 def test_oddspapi_client_sends_api_key_query_param() -> None:
@@ -138,6 +147,61 @@ def test_normalize_price_rows_extracts_nested_player_prices() -> None:
     assert rows[0]["bookmaker_outcome_id"] == "3.5/over"
     assert rows[0]["line"] == 3.5
     assert rows[0]["price_decimal"] == 1.91
+
+
+def test_normalize_price_rows_keeps_list_markets_outcomes_and_players() -> None:
+    payload = {
+        "fixtureId": "id1",
+        "bookmakerOdds": {
+            "bet365": {
+                "bookmakerFixtureId": "book-1",
+                "markets": [
+                    {
+                        "marketId": "1012",
+                        "marketName": "Total Goals",
+                        "marketActive": True,
+                        "outcomes": [
+                            {
+                                "outcomeId": "1012-over",
+                                "outcomeName": "Over",
+                                "players": [
+                                    {
+                                        "playerId": "0",
+                                        "active": True,
+                                        "bookmakerOutcomeId": "2.5/over",
+                                        "line": "2.5",
+                                        "price": "1.90",
+                                    },
+                                    {
+                                        "playerId": "alt",
+                                        "active": True,
+                                        "bookmakerOutcomeId": "3.5/over",
+                                        "line": "3.5",
+                                        "price": "2.45",
+                                    },
+                                ],
+                            },
+                            {
+                                "outcomeId": "1012-under",
+                                "outcomeName": "Under",
+                                "bookmakerOutcomeId": "2.5/under",
+                                "price": "1.95",
+                            },
+                        ],
+                    }
+                ],
+            }
+        },
+    }
+
+    rows = normalize_price_rows(payload)
+
+    assert len(rows) == 3
+    assert {row["bookmaker_slug"] for row in rows} == {"bet365"}
+    assert {row["market_id"] for row in rows} == {"1012"}
+    assert {row["outcome_name"] for row in rows} == {"Over", "Under"}
+    assert {row["line"] for row in rows} == {2.5, 3.5}
+    assert {row["price_decimal"] for row in rows} == {1.9, 2.45, 1.95}
 
 
 def test_normalize_historical_price_rows_extracts_history_ticks() -> None:
