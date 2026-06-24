@@ -21,6 +21,13 @@ LOG = logging.getLogger("clickup_bridge")
 
 REPLY_MARKER = "agent-reply::"
 
+CLI_GUARDRAIL = (
+    "You are answering a ClickUp message as a read-only assistant. "
+    "Reply with TEXT ONLY. Do NOT edit, create, or delete files; do NOT run git, "
+    "gh, commit, push, or open pull requests. If code changes are needed, describe "
+    "them in your reply and tell the user to route the work to @jules.\n\n---\n\n"
+)
+
 
 def is_bot_reply(text):
     # SECURITY/loop-prevention: ClickUp escapes markdown brackets (e.g. [..] -> \[..\]),
@@ -653,6 +660,7 @@ async def call_cli_agent(agent_request: AgentRequest, config: Config) -> str:
 
 
 def cli_command(agent: str, instruction: str, config: Config) -> list[str]:
+    instruction = CLI_GUARDRAIL + instruction
     if agent == "claude":
         return [config.claude_bin, "-p", instruction]
     if agent == "gemini":
@@ -671,7 +679,7 @@ def cli_command(agent: str, instruction: str, config: Config) -> list[str]:
             instruction,
         ]
     if agent == "agy":
-        return [config.agy_bin, "-p", instruction]
+        return [config.agy_bin, "--sandbox", "-p", instruction]
     raise AgentFailure(f"Unsupported agent @{agent}.")
 
 
