@@ -5,9 +5,11 @@ from sqlalchemy.orm import sessionmaker
 
 from app.db.models import fixture
 from app.modeling.baseline import (
+    FixtureContext,
     SelectedPrice,
     average_no_vig_market_probabilities,
     blend_probabilities,
+    build_recommendation,
     estimate_1x2_probabilities,
     finished_fixture_matches,
     is_price_fresh,
@@ -157,3 +159,51 @@ def _as_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
+
+
+def test_pick_score_prefers_likely_outcome_over_high_ev_longshot() -> None:
+    # The headline selection must surface "what will probably happen", not the
+    # highest-EV longshot. pick_score is probability-dominant, blended with value.
+    kickoff = datetime(2026, 7, 1, 18, 0, tzinfo=UTC)
+    changed_at = kickoff - timedelta(hours=3)
+    context = FixtureContext(
+        fixture_id=1,
+        kickoff_at=kickoff,
+        league_id=10,
+        league="World Cup",
+        season=2026,
+        home_team_id=101,
+        away_team_id=102,
+        home_team="Home FC",
+        away_team="Away FC",
+        status_short="NS",
+    )
+    favourite = build_recommendation(
+        context=context,
+        price=SelectedPrice("api_football", "pinnacle", "101", "101", 1.55, changed_at),
+        p_fair=0.65,
+        p_model=0.65,
+        p_market=0.64,
+        confidence=0.6,
+        market_liquid=True,
+    )
+    longshot = build_recommendation(
+        context=context,
+        price=SelectedPrice("api_football", "pinnacle", "101", "103", 7.0, changed_at),
+        p_fair=0.18,
+        p_model=0.18,
+        p_market=0.143,
+        confidence=0.6,
+        market_liquid=True,
+    )
+
+    # Old ranking (by -ev_per_unit) would have put the longshot on top.
+    assert longshot["ev_per_unit"] > favourite["ev_per_unit"]
+    # New ranking: the likely favourite wins the headline via pick_score.
+    assert favourite["pick_score"] > longshot["pick_score"]
+    # pick_score formula is probability-dominant: p_fair * (1 + max(edge, 0)).
+    assert favourite["pick_score"] == round(
+        favourite["p_fair"] * (1.0 + max(favourite["edge"], 0.0)), 6
+    )
+    ranked = sorted([longshot, favourite], key=lambda row: -row["pick_score"])
+    assert ranked[0]["outcome_id"] == "101"

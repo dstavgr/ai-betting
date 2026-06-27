@@ -100,7 +100,9 @@ def baseline_recommendations_for_fixture(
         )
         for outcome_id in OUTCOME_ORDER
     ]
-    recommendations.sort(key=lambda row: (row["decision"] != "recommend", -row["ev_per_unit"]))
+    # Headline selection = most likely outcome (blended with value via pick_score),
+    # NOT the highest-EV longshot. decision is shown as an attribute, not the ranker.
+    recommendations.sort(key=lambda row: -row["pick_score"])
     return recommendations[:limit] if limit else recommendations
 
 
@@ -116,7 +118,10 @@ def baseline_recommendations(session: Session, *, limit: int = 25) -> list[dict[
                 model_cache=model_cache,
             )
         )
-        recommendations.sort(key=lambda row: (row["decision"] != "recommend", -row["ev_per_unit"]))
+        # Tips list stays value-first (recommended bets lead) but ranks within
+        # by the confidence blend rather than raw EV, so it no longer leads with
+        # the most extreme longshot.
+        recommendations.sort(key=lambda row: (row["decision"] != "recommend", -row["pick_score"]))
         recommendations = recommendations[:limit]
     return recommendations
 
@@ -541,6 +546,12 @@ def build_recommendation(
         "p_implied": round(ev.implied_raw, 6),
         "edge": round(ev.edge, 6),
         "ev_per_unit": round(ev.ev_per_unit, 6),
+        # pick_score ranks the headline selection by how likely the outcome is
+        # (p_fair, model-driven), tilted up only by positive value. Probability
+        # dominates, so a longshot's high odds can never out-rank a likely
+        # favourite — this is what surfaces "what will probably happen" instead
+        # of the highest-EV longshot.
+        "pick_score": round(p_fair * (1.0 + max(ev.edge, 0.0)), 6),
         "confidence": round(confidence, 6),
         "decision": decision_value,
         "reason_code": reason,

@@ -84,6 +84,7 @@ class Recommendation(BaseModel):
     p_implied: float
     edge: float
     ev_per_unit: float
+    pick_score: float
     confidence: float
     decision: str
     reason_code: str | None
