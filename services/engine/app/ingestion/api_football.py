@@ -135,6 +135,22 @@ class ApiFootballClient:
     def fixtures(self, **params: Any) -> list[dict[str, Any]]:
         return self.collect("fixtures", params)
 
+    def odds(
+        self,
+        fixture_id: int,
+        *,
+        bookmaker: int | str | None = None,
+        bet: int | str | None = None,
+    ) -> list[dict[str, Any]]:
+        return self.collect(
+            "odds",
+            {
+                "fixture": fixture_id,
+                "bookmaker": bookmaker,
+                "bet": bet,
+            },
+        )
+
     def fixture_events(self, fixture_id: int) -> list[dict[str, Any]]:
         return self.collect("fixtures/events", {"fixture": fixture_id})
 

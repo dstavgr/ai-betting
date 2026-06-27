@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     api_football_rate_limit_per_minute: int = Field(default=450)
     api_football_timeout_seconds: float = Field(default=20.0)
     api_football_default_league_id: int | None = Field(default=None)
+    api_football_odds_enabled: bool = Field(default=True)
+    api_football_odds_max_fixtures_per_run: int = Field(default=100)
     oddspapi_key: str = Field(default="")
     oddspapi_base_url: str = Field(default="https://api.oddspapi.io")
     oddspapi_timeout_seconds: float = Field(default=20.0)

@@ -13,6 +13,7 @@ from app.db.session import SessionLocal
 from app.features import build_fixture_snapshot, build_season_snapshots
 from app.ingestion.api_football import ApiFootballClient
 from app.ingestion.api_football_ingest import ApiFootballIngestor
+from app.ingestion.api_football_odds_ingest import ApiFootballOddsIngestor
 from app.ingestion.oddspapi import OddspapiClient
 from app.ingestion.oddspapi_ingest import OddspapiIngestor
 from app.ingestion.odds_api_io import OddsApiIoClient
@@ -38,7 +39,23 @@ def main() -> None:
     sync_season.add_argument("--league-id", type=int, default=settings.api_football_default_league_id)
     sync_season.add_argument("--season", type=int, required=True)
     sync_season.add_argument("--include-details", action="store_true")
+    sync_season.add_argument("--sync-odds", default=settings.api_football_odds_enabled, action=argparse.BooleanOptionalAction)
+    sync_season.add_argument("--odds-limit", type=int, default=settings.api_football_odds_max_fixtures_per_run)
+    sync_season.add_argument("--odds-max-requests", type=int)
     sync_season.set_defaults(func=api_football_sync_season)
+
+    sync_odds = api_football_subcommands.add_parser(
+        "sync-odds",
+        help="Sync API-Football prematch odds for upcoming local fixtures.",
+    )
+    sync_odds.add_argument("--league-id", type=int)
+    sync_odds.add_argument("--season", type=int)
+    sync_odds.add_argument("--from-time", type=parse_cli_datetime)
+    sync_odds.add_argument("--to-time", type=parse_cli_datetime)
+    sync_odds.add_argument("--limit", type=int, default=settings.api_football_odds_max_fixtures_per_run)
+    sync_odds.add_argument("--max-requests", type=int)
+    sync_odds.add_argument("--dry-run", action=argparse.BooleanOptionalAction)
+    sync_odds.set_defaults(func=api_football_sync_odds)
 
     fixture_details = api_football_subcommands.add_parser(
         "sync-fixture-details",
@@ -246,7 +263,17 @@ def api_football_sync_season(args: argparse.Namespace) -> None:
     with SessionLocal() as session, ApiFootballClient.from_settings(settings) as client:
         ingestor = ApiFootballIngestor(session, client)
         counts = ingestor.sync_season(args.league_id, args.season, include_details=args.include_details)
-        print(json.dumps(counts.as_dict(), indent=2, sort_keys=True))
+        result: dict[str, Any] = {"fixtures": counts.as_dict()}
+        if args.sync_odds:
+            odds_counts = ApiFootballOddsIngestor(session, client).sync_prematch_odds(
+                league_id=args.league_id,
+                season_year=args.season,
+                limit=args.odds_limit,
+                max_requests=args.odds_max_requests,
+            )
+            result["api_football_odds"] = odds_counts.as_dict()
+            result["api_football_odds"]["worst_case_requests"] = odds_counts.eligible_fixtures
+        print(json.dumps(result, indent=2, sort_keys=True))
 
 
 def api_football_sync_fixture_details(args: argparse.Namespace) -> None:
@@ -254,6 +281,22 @@ def api_football_sync_fixture_details(args: argparse.Namespace) -> None:
         ingestor = ApiFootballIngestor(session, client)
         counts = ingestor.sync_fixture_details(args.fixture_id)
         print(json.dumps(counts.as_dict(), indent=2, sort_keys=True))
+
+
+def api_football_sync_odds(args: argparse.Namespace) -> None:
+    with SessionLocal() as session, ApiFootballClient.from_settings(settings) as client:
+        counts = ApiFootballOddsIngestor(session, client).sync_prematch_odds(
+            league_id=args.league_id,
+            season_year=args.season,
+            from_time=args.from_time,
+            to_time=args.to_time,
+            limit=args.limit,
+            max_requests=args.max_requests,
+            dry_run=bool(args.dry_run),
+        )
+        result = counts.as_dict()
+        result["worst_case_requests"] = counts.eligible_fixtures
+        print(json.dumps(result, indent=2, sort_keys=True))
 
 
 def features_build_season(args: argparse.Namespace) -> None:
@@ -556,6 +599,13 @@ def _warm_news_fixture(session, fixture_id: int) -> dict[str, Any]:
 
 def _dict_or_empty(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
+
+
+def parse_cli_datetime(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def _parse_optional_int(value: str | None, label: str) -> int | None:
