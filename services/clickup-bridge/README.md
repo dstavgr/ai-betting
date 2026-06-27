@@ -11,7 +11,7 @@ This service is intentionally **not** Dockerized. It runs under systemd on the h
 - Only `taskCommentPosted` events are handled.
 - Comments starting with `[agent-reply]` are ignored to prevent loops.
 - Comments authored by `CLICKUP_BOT_USER_ID` are ignored when that env var is set.
-- The first mention among `@claude`, `@gemini`, `@codex`, `@agy`, and `@jules` chooses the agent.
+- The first mention among `@claude2`, `@claude`, `@gemini`, `@codex`, `@agy`, and `@jules` chooses the agent.
 - The mention is stripped and the remaining text is passed as the instruction.
 - The webhook returns immediately; agent work runs in the FastAPI background task.
 - Replies are posted back to ClickUp as:
@@ -42,6 +42,7 @@ Required:
 Agent-specific:
 
 - `CLAUDE_CODE_OAUTH_TOKEN`: available to the Claude CLI.
+- `CLAUDE2_CODE_OAUTH_TOKEN`: available to the Claude 2 CLI.
 - `GEMINI_API_KEY`: available to the Gemini CLI.
 - `JULES_API_KEY`: used for Jules session creation.
 
@@ -49,6 +50,7 @@ Optional:
 
 - `CLICKUP_BOT_USER_ID`: ClickUp user id for the bridge bot; matching comments are ignored.
 - `CLAUDE_BIN`: default `/home/ubuntu/.npm-global/bin/claude`.
+- `CLAUDE2_BIN`: default `/home/ubuntu/.npm-global/bin/claude`.
 - `GEMINI_BIN`: default `/home/ubuntu/.npm-global/bin/gemini`.
 - `AGY_BIN`: default `/home/ubuntu/.local/bin/agy`.
 - `CODEX_BIN`: default `codex`.

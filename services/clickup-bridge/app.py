@@ -39,7 +39,7 @@ CLICKUP_TASK_URL = "https://api.clickup.com/api/v2/task/{task_id}"
 CLICKUP_CHAT_CHANNELS_URL = "https://api.clickup.com/api/v3/workspaces/{team_id}/chat/channels"
 CLICKUP_CHAT_MESSAGES_URL = "https://api.clickup.com/api/v3/workspaces/{team_id}/chat/channels/{channel_id}/messages"
 JULES_SESSIONS_URL = "https://jules.googleapis.com/v1alpha/sessions"
-MENTION_RE = re.compile(r"@(claude|gemini|codex|agy|jules)\b", re.IGNORECASE)
+MENTION_RE = re.compile(r"@(claude2|claude|gemini|codex|agy|jules)\b", re.IGNORECASE)
 
 app = FastAPI(title="ClickUp Agent Bridge")
 
@@ -51,6 +51,7 @@ class Config:
     clickup_team_id: str
     clickup_bot_user_id: str | None
     claude_bin: str
+    claude2_bin: str
     gemini_bin: str
     agy_bin: str
     codex_bin: str
@@ -72,6 +73,7 @@ class Config:
             clickup_team_id=os.environ.get("CLICKUP_TEAM_ID", "90151427181"),
             clickup_bot_user_id=os.environ.get("CLICKUP_BOT_USER_ID") or None,
             claude_bin=os.environ.get("CLAUDE_BIN", "/home/ubuntu/.npm-global/bin/claude"),
+            claude2_bin=os.environ.get("CLAUDE2_BIN", "/home/ubuntu/.npm-global/bin/claude"),
             gemini_bin=os.environ.get("GEMINI_BIN", "/home/ubuntu/.npm-global/bin/gemini"),
             agy_bin=os.environ.get("AGY_BIN", "/home/ubuntu/.local/bin/agy"),
             codex_bin=os.environ.get("CODEX_BIN", "codex"),
@@ -629,6 +631,9 @@ async def call_cli_agent(agent_request: AgentRequest, config: Config) -> str:
     command = cli_command(agent_request.agent, agent_request.instruction, config)
     env = os.environ.copy()
 
+    if agent_request.agent == "claude2" and "CLAUDE2_CODE_OAUTH_TOKEN" in env:
+        env["CLAUDE_CODE_OAUTH_TOKEN"] = env["CLAUDE2_CODE_OAUTH_TOKEN"]
+
     # SECURITY: Never build a shell command string from untrusted ClickUp text.
     # The instruction is passed as one subprocess argument with shell=False.
     process = await asyncio.create_subprocess_exec(
@@ -661,6 +666,8 @@ async def call_cli_agent(agent_request: AgentRequest, config: Config) -> str:
 
 def cli_command(agent: str, instruction: str, config: Config) -> list[str]:
     instruction = CLI_GUARDRAIL + instruction
+    if agent == "claude2":
+        return [config.claude2_bin, "-p", instruction]
     if agent == "claude":
         return [config.claude_bin, "-p", instruction]
     if agent == "gemini":
