@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-from app.db.models import news_assessment, news_source, news_source_team
+from app.db.models import news_assessment, news_source, news_source_team, news_team_source
 from app.news import sources
 from app.news.sources import NewsSource, SourceRegistry, SourceTier
 
@@ -102,6 +102,69 @@ def get_cached_assessment(
     if generated_at < datetime.now(UTC) - timedelta(minutes=max_age_minutes):
         return None
     return row["payload"]
+
+
+def save_team_sources(session, team: str, candidates: list[dict]) -> int:
+    processed = 0
+    dialect = session.get_bind().dialect.name
+    for candidate in candidates:
+        domain = str(candidate.get("domain") or "").strip()
+        if not domain:
+            continue
+        values = {
+            "team": team,
+            "source_domain": domain,
+            "feed_url": candidate.get("feed_url"),
+            "source_type": candidate.get("source_type"),
+            "tier": candidate.get("tier"),
+            "verified": bool(candidate.get("verified")),
+            "last_verified_at": candidate.get("last_verified_at"),
+        }
+        insert_stmt = _insert(news_team_source, dialect).values(**values)
+        stmt = insert_stmt.on_conflict_do_update(
+            index_elements=["team", "source_domain"],
+            set_={
+                "feed_url": insert_stmt.excluded.feed_url,
+                "source_type": insert_stmt.excluded.source_type,
+                "tier": insert_stmt.excluded.tier,
+                "verified": insert_stmt.excluded.verified,
+                "last_verified_at": insert_stmt.excluded.last_verified_at,
+            },
+        )
+        session.execute(stmt)
+        processed += 1
+    session.commit()
+    return processed
+
+
+def get_team_sources(
+    session,
+    team: str,
+    *,
+    verified_only: bool = True,
+) -> list[dict]:
+    stmt = (
+        select(
+            news_team_source.c.feed_url,
+            news_team_source.c.source_domain,
+        )
+        .where(
+            news_team_source.c.team == team,
+            news_team_source.c.feed_url.is_not(None),
+        )
+        .order_by(news_team_source.c.source_domain.asc())
+    )
+    if verified_only:
+        stmt = stmt.where(news_team_source.c.verified.is_(True))
+
+    rows = session.execute(stmt).mappings().all()
+    return [
+        {
+            "url": row["feed_url"],
+            "source_domain": row["source_domain"],
+        }
+        for row in rows
+    ]
 
 
 def _upsert_source(session, source: NewsSource) -> None:

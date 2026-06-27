@@ -327,6 +327,21 @@ news_source_team = Table(
     UniqueConstraint("source_id", "team", name="uq_news_source_team"),
 )
 
+news_team_source = Table(
+    "news_team_source",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("team", String(180), nullable=False),
+    Column("source_domain", String(220), nullable=False),
+    Column("feed_url", Text),
+    Column("source_type", String(40), nullable=False),
+    Column("tier", String(80), nullable=False),
+    Column("verified", Boolean, nullable=False, server_default=text("false")),
+    Column("discovered_at", DateTime(timezone=True), nullable=False, server_default=text("now()")),
+    Column("last_verified_at", DateTime(timezone=True)),
+    UniqueConstraint("team", "source_domain", name="uq_news_team_source_team_domain"),
+)
+
 news_assessment = Table(
     "news_assessment",
     metadata,

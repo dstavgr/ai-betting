@@ -28,17 +28,18 @@ def fixture_news_assessment(
         raise ValueError(f"Fixture {fixture_id} not found")
 
     source_registry = registry or store.load_registry(session)
-    news_adapter = adapter or _configured_adapter()
     since = _since(fixture_row.get("kickoff_at"))
     home_team = fixture_row.get("home_team") or "Home"
     away_team = fixture_row.get("away_team") or "Away"
+    home_adapter = adapter or _configured_adapter(session, home_team)
+    away_adapter = adapter or _configured_adapter(session, away_team)
 
     home_bundle = _cached_or_assessed_bundle(
         session,
         fixture_id,
         home_team,
         since,
-        news_adapter,
+        home_adapter,
         source_registry,
     )
     away_bundle = _cached_or_assessed_bundle(
@@ -46,7 +47,7 @@ def fixture_news_assessment(
         fixture_id,
         away_team,
         since,
-        news_adapter,
+        away_adapter,
         source_registry,
     )
     news_adjusted = build_news_adjusted_outcome(
@@ -65,8 +66,12 @@ def fixture_news_assessment(
     }
 
 
-def _configured_adapter() -> NewsSourceAdapter:
+def _configured_adapter(session=None, team_name: str | None = None) -> NewsSourceAdapter:
     if settings.news_adapter.lower() == "rss":
+        if session is not None and team_name:
+            feeds = store.get_team_sources(session, team_name, verified_only=True)
+            if feeds:
+                return RSSNewsAdapter(feeds=feeds)
         return RSSNewsAdapter()
     return StubAdapter()
 

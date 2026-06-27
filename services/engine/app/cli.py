@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import or_, select
 
 from app.config import settings
-from app.db.models import fixture
+from app.db.models import fixture, team
 from app.db.session import SessionLocal
 from app.features import build_fixture_snapshot, build_season_snapshots
 from app.ingestion.api_football import ApiFootballClient
@@ -75,6 +75,16 @@ def main() -> None:
     news_warm_parser.add_argument("--fixture-id", type=int, required=True)
     news_warm_parser.add_argument("--upcoming", type=int, default=0)
     news_warm_parser.set_defaults(func=news_warm)
+
+    news_discover_parser = news_subcommands.add_parser(
+        "discover",
+        help="Discover and store per-team news sources.",
+    )
+    news_discover_parser.add_argument("--team")
+    news_discover_parser.add_argument("--country")
+    news_discover_parser.add_argument("--league")
+    news_discover_parser.add_argument("--all", action="store_true")
+    news_discover_parser.set_defaults(func=news_discover)
 
     oddspapi = subparsers.add_parser("oddspapi")
     oddspapi_subcommands = oddspapi.add_subparsers(dest="command", required=True)
@@ -288,6 +298,38 @@ def news_warm(args: argparse.Namespace) -> None:
     )
 
 
+def news_discover(args: argparse.Namespace) -> None:
+    from app.news import discovery
+
+    if not args.team and not args.all:
+        raise ValueError("Provide --team or --all.")
+
+    with SessionLocal() as session:
+        if args.all:
+            league_id = _parse_optional_int(args.league, "--league")
+            team_names = _upcoming_news_team_names(session, league_id=league_id)
+            for team_name in team_names:
+                summary = discovery.discover_and_store(
+                    session,
+                    team_name,
+                    country=args.country,
+                    league=args.league,
+                )
+                session.commit()
+                print(json.dumps(summary, sort_keys=True))
+            return
+
+        summary = discovery.discover_and_store(
+            session,
+            args.team,
+            country=args.country,
+            league=args.league,
+        )
+        session.commit()
+
+    print(json.dumps(summary, indent=2, sort_keys=True))
+
+
 def oddspapi_status_command(_: argparse.Namespace) -> None:
     with OddspapiClient.from_settings(settings) as client:
         print(json.dumps(client.account(), indent=2, sort_keys=True))
@@ -469,6 +511,30 @@ def _upcoming_news_fixture_ids(session, *, limit: int, exclude_fixture_ids: set[
     return list(rows)
 
 
+def _upcoming_news_team_names(session, *, league_id: int | None = None) -> list[str]:
+    home_team = team.alias("home_team")
+    away_team = team.alias("away_team")
+    filters = [
+        fixture.c.kickoff_at >= datetime.now(UTC),
+        fixture.c.status_short.not_in(FINISHED_STATUSES),
+    ]
+    if league_id is not None:
+        filters.append(fixture.c.league_id == league_id)
+
+    home_rows = session.execute(
+        select(home_team.c.name)
+        .select_from(fixture.outerjoin(home_team, fixture.c.home_team_id == home_team.c.id))
+        .where(*filters, home_team.c.name.is_not(None))
+    ).scalars()
+    away_rows = session.execute(
+        select(away_team.c.name)
+        .select_from(fixture.outerjoin(away_team, fixture.c.away_team_id == away_team.c.id))
+        .where(*filters, away_team.c.name.is_not(None))
+    ).scalars()
+
+    return sorted({name for name in [*home_rows, *away_rows] if name and name.strip()})
+
+
 def _warm_news_fixture(session, fixture_id: int) -> dict[str, Any]:
     assessment = fixture_news_assessment(session, fixture_id)
 
@@ -490,6 +556,15 @@ def _warm_news_fixture(session, fixture_id: int) -> dict[str, Any]:
 
 def _dict_or_empty(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
+
+
+def _parse_optional_int(value: str | None, label: str) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise ValueError(f"{label} must be an integer when used with --all.") from exc
 
 
 if __name__ == "__main__":
